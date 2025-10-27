@@ -84,7 +84,11 @@ const getConditionStatus = (issuer: Issuer) => {
   return { status: 'Not Ready', icon: <TimesCircleIcon />, color: 'red' };
 };
 
-export const IssuersTable: React.FC = () => {
+interface IssuersTableProps {
+  selectedProject: string;
+}
+
+export const IssuersTable: React.FC<IssuersTableProps> = ({ selectedProject }) => {
   const { t } = useTranslation('plugin__ocp-secrets-management');
   const [openDropdowns, setOpenDropdowns] = React.useState<Record<string, boolean>>({});
   const [deleteModal, setDeleteModal] = React.useState<{
@@ -185,7 +189,7 @@ export const IssuersTable: React.FC = () => {
   // Watch both Issuers and ClusterIssuers
   const [issuers, issuersLoaded, issuersError] = useK8sWatchResource<Issuer[]>({
     groupVersionKind: IssuerModel,
-    namespace: 'demo', // Focus on demo project
+    namespace: selectedProject === 'all' ? undefined : selectedProject,
     isList: true,
   });
 
@@ -198,12 +202,13 @@ export const IssuersTable: React.FC = () => {
   const loadError = issuersError || clusterIssuersError;
 
   const columns = [
-    { title: t('Name'), width: 16 },
-    { title: t('Type'), width: 11 },
-    { title: t('Scope'), width: 11 },
-    { title: t('Issuer Type'), width: 13 },
-    { title: t('Details'), width: 27 },
-    { title: t('Status'), width: 12 },
+    { title: t('Name'), width: 14 },
+    { title: t('Namespace'), width: 12 },
+    { title: t('Type'), width: 10 },
+    { title: t('Scope'), width: 10 },
+    { title: t('Issuer Type'), width: 12 },
+    { title: t('Details'), width: 22 },
+    { title: t('Status'), width: 10 },
     { title: '', width: 10 }, // Actions column
   ];
 
@@ -232,6 +237,7 @@ export const IssuersTable: React.FC = () => {
       return {
         cells: [
           issuer.metadata.name,
+          issuer.metadata.namespace || 'Cluster',
           issuer.scope === 'Namespace' ? 'Issuer' : 'ClusterIssuer',
           issuer.scope,
           issuerType,

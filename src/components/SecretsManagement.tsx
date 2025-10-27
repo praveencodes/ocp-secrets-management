@@ -17,13 +17,36 @@ import { CertificatesTable } from './CertificatesTable';
 import { IssuersTable } from './IssuersTable';
 import { ExternalSecretsTable } from './ExternalSecretsTable';
 import { SecretStoresTable } from './SecretStoresTable';
+import { PushSecretsTable } from './PushSecretsTable';
+import { SecretProviderClassTable } from './SecretProviderClassTable';
+import { useK8sWatchResource } from '@openshift-console/dynamic-plugin-sdk';
 
-type OperatorType = 'cert-manager' | 'external-secrets' | 'all';
-type ResourceKind = 'certificates' | 'issuers' | 'externalsecrets' | 'secretstores' | 'all';
+type OperatorType = 'cert-manager' | 'external-secrets' | 'secrets-store-csi' | 'all';
+type ResourceKind = 'certificates' | 'issuers' | 'externalsecrets' | 'secretstores' | 'pushsecrets' | 'secretproviderclasses' | 'all';
+type ProjectType = 'all' | string;
+
+// Project/Namespace resource model
+const ProjectModel = {
+  group: '',
+  version: 'v1',
+  kind: 'Namespace',
+};
+
+interface Project {
+  metadata: {
+    name: string;
+    labels?: Record<string, string>;
+    annotations?: Record<string, string>;
+  };
+  status?: {
+    phase: string;
+  };
+}
 
 interface FilterState {
   operator: OperatorType;
   resourceKind: ResourceKind;
+  project: ProjectType;
 }
 
 export default function SecretsManagement() {
@@ -31,14 +54,73 @@ export default function SecretsManagement() {
   const [filters, setFilters] = React.useState<FilterState>({
     operator: 'all',
     resourceKind: 'all',
+    project: 'all',
   });
 
+  // Fetch all namespaces/projects dynamically
+  const [projects, projectsLoaded, projectsError] = useK8sWatchResource<Project[]>({
+    groupVersionKind: ProjectModel,
+    isList: true,
+  });
 
   const operatorOptions = [
     { value: 'all', label: t('All Operators'), description: t('Show resources from all operators') },
     { value: 'cert-manager', label: 'cert-manager', description: t('Certificate lifecycle management') },
     { value: 'external-secrets', label: 'External Secrets Operator', description: t('External secret synchronization') },
+    { value: 'secrets-store-csi', label: 'Secrets Store CSI Driver', description: t('Secret provider integration') },
   ];
+
+  // Generate dynamic project options from fetched namespaces
+  const getProjectOptions = React.useMemo(() => {
+    const baseOptions = [
+      { value: 'all', label: t('All Projects'), description: t('Show resources from all projects') }
+    ];
+
+    if (!projectsLoaded || projectsError || !projects) {
+      return baseOptions;
+    }
+
+    // Filter and sort projects
+    const sortedProjects = projects
+      .filter((project) => {
+        // Filter out system namespaces that are typically not user-relevant
+        const name = project.metadata.name;
+        const isSystemNamespace = name.startsWith('kube-') || 
+                                 name.startsWith('openshift-') ||
+                                 name === 'default' ||
+                                 name === 'kube-node-lease' ||
+                                 name === 'kube-public';
+        
+        // Include active projects only
+        const isActive = !project.status || project.status.phase !== 'Terminating';
+        
+        return isActive && (!isSystemNamespace || 
+                           name === 'default' || 
+                           name === 'openshift-operators' ||
+                           name === 'openshift-monitoring');
+      })
+      .sort((a, b) => {
+        // Sort with common projects first, then alphabetically
+        const commonProjects = ['default', 'openshift-operators', 'openshift-monitoring'];
+        const aIsCommon = commonProjects.includes(a.metadata.name);
+        const bIsCommon = commonProjects.includes(b.metadata.name);
+        
+        if (aIsCommon && !bIsCommon) return -1;
+        if (!aIsCommon && bIsCommon) return 1;
+        return a.metadata.name.localeCompare(b.metadata.name);
+      });
+
+    const projectOptions = sortedProjects.map((project) => ({
+      value: project.metadata.name,
+      label: project.metadata.name,
+      description: project.metadata.labels?.['openshift.io/display-name'] || 
+                  `${t('Project')}: ${project.metadata.name}`,
+    }));
+
+    return [...baseOptions, ...projectOptions];
+  }, [projects, projectsLoaded, projectsError, t]);
+
+  const projectOptions = getProjectOptions;
 
   const getResourceOptions = (operator: OperatorType) => {
     const baseOptions = [{ value: 'all', label: t('All Resources'), description: t('Show all resource types') }];
@@ -50,6 +132,8 @@ export default function SecretsManagement() {
         { value: 'issuers', label: t('Issuers'), description: t('cert-manager issuers') },
         { value: 'externalsecrets', label: t('External Secrets'), description: t('External secret definitions') },
         { value: 'secretstores', label: t('Secret Stores'), description: t('External secret stores') },
+        { value: 'pushsecrets', label: t('Push Secrets'), description: t('External secret push configurations') },
+        { value: 'secretproviderclasses', label: t('Secret Provider Classes'), description: t('CSI secret provider configurations') },
       ];
     } else if (operator === 'cert-manager') {
       return [
@@ -62,6 +146,12 @@ export default function SecretsManagement() {
         ...baseOptions,
         { value: 'externalsecrets', label: t('External Secrets'), description: t('Secret synchronization rules') },
         { value: 'secretstores', label: t('Secret Stores'), description: t('External secret backends') },
+        { value: 'pushsecrets', label: t('Push Secrets'), description: t('Secret push configurations') },
+      ];
+    } else if (operator === 'secrets-store-csi') {
+      return [
+        ...baseOptions,
+        { value: 'secretproviderclasses', label: t('Secret Provider Classes'), description: t('Secret provider configurations') },
       ];
     }
     return baseOptions;
@@ -70,6 +160,7 @@ export default function SecretsManagement() {
   const handleOperatorChange = (event: React.ChangeEvent<HTMLSelectElement>) => {
     const newOperator = event.target.value as OperatorType;
     setFilters(prev => ({
+      ...prev,
       operator: newOperator,
       resourceKind: 'all', // Reset resource filter when operator changes
     }));
@@ -79,6 +170,13 @@ export default function SecretsManagement() {
     setFilters(prev => ({
       ...prev,
       resourceKind: event.target.value as ResourceKind,
+    }));
+  };
+
+  const handleProjectChange = (event: React.ChangeEvent<HTMLSelectElement>) => {
+    setFilters(prev => ({
+      ...prev,
+      project: event.target.value as ProjectType,
     }));
   };
 
@@ -108,6 +206,30 @@ export default function SecretsManagement() {
         {/* Filter Controls */}
         <div className="co-m-pane__filter-bar" style={{ padding: '16px 0', borderBottom: '1px solid #ddd', marginBottom: '16px' }}>
           <Flex spaceItems={{ default: 'spaceItemsMd' }}>
+            <FlexItem>
+              <label className="co-m-filter-label" style={{ marginRight: '8px', fontWeight: 'bold' }}>
+                {t('Project')}:
+              </label>
+              <select 
+                className="form-control" 
+                value={filters.project} 
+                onChange={handleProjectChange}
+                disabled={!projectsLoaded}
+                style={{ width: '200px', display: 'inline-block' }}
+              >
+                {!projectsLoaded ? (
+                  <option value="all">{t('Loading projects...')}</option>
+                ) : projectsError ? (
+                  <option value="all">{t('Error loading projects')}</option>
+                ) : (
+                  projectOptions.map((option) => (
+                    <option key={option.value} value={option.value}>
+                      {option.label}
+                    </option>
+                  ))
+                )}
+              </select>
+            </FlexItem>
             <FlexItem>
               <label className="co-m-filter-label" style={{ marginRight: '8px', fontWeight: 'bold' }}>
                 {t('Operator')}:
@@ -144,8 +266,10 @@ export default function SecretsManagement() {
             </FlexItem>
             <FlexItem>
               <Badge isRead>
-                {filters.operator === 'all' ? t('All Operators') : 
-                 filters.operator === 'cert-manager' ? 'cert-manager' : 'External Secrets'}
+                {filters.project === 'all' ? t('All Projects') : filters.project}
+                {` | ${filters.operator === 'all' ? t('All Operators') : 
+                 filters.operator === 'cert-manager' ? 'cert-manager' : 
+                 filters.operator === 'external-secrets' ? 'External Secrets' : 'Secrets Store CSI'}`}
                 {filters.resourceKind !== 'all' && ` → ${getResourceOptions(filters.operator).find(opt => opt.value === filters.resourceKind)?.label}`}
               </Badge>
             </FlexItem>
@@ -167,7 +291,7 @@ export default function SecretsManagement() {
                     </Flex>
                   </CardTitle>
                   <CardBody>
-                    <CertificatesTable />
+                    <CertificatesTable selectedProject={filters.project} />
                   </CardBody>
                 </Card>
               </GridItem>
@@ -185,7 +309,7 @@ export default function SecretsManagement() {
                     </Flex>
                   </CardTitle>
                   <CardBody>
-                    <IssuersTable />
+                    <IssuersTable selectedProject={filters.project} />
                   </CardBody>
                 </Card>
               </GridItem>
@@ -204,7 +328,7 @@ export default function SecretsManagement() {
                     </Flex>
                   </CardTitle>
                   <CardBody>
-                    <ExternalSecretsTable />
+                    <ExternalSecretsTable selectedProject={filters.project} />
                   </CardBody>
                 </Card>
               </GridItem>
@@ -222,7 +346,44 @@ export default function SecretsManagement() {
                     </Flex>
                   </CardTitle>
                   <CardBody>
-                    <SecretStoresTable />
+                    <SecretStoresTable selectedProject={filters.project} />
+                  </CardBody>
+                </Card>
+              </GridItem>
+            )}
+
+            {shouldShowComponent('external-secrets', 'pushsecrets') && (
+              <GridItem span={12}>
+                <Card>
+                  <CardTitle>
+                    <Flex alignItems={{ default: 'alignItemsCenter' }}>
+                      <FlexItem>
+                        {t('Push Secrets')}
+                        <Badge isRead style={{ marginLeft: '8px' }}>External Secrets Operator</Badge>
+                      </FlexItem>
+                    </Flex>
+                  </CardTitle>
+                  <CardBody>
+                    <PushSecretsTable selectedProject={filters.project} />
+                  </CardBody>
+                </Card>
+              </GridItem>
+            )}
+
+            {/* Secrets Store CSI Driver Resources */}
+            {shouldShowComponent('secrets-store-csi', 'secretproviderclasses') && (
+              <GridItem span={12}>
+                <Card>
+                  <CardTitle>
+                    <Flex alignItems={{ default: 'alignItemsCenter' }}>
+                      <FlexItem>
+                        {t('Secret Provider Classes')}
+                        <Badge isRead style={{ marginLeft: '8px' }}>Secrets Store CSI Driver</Badge>
+                      </FlexItem>
+                    </Flex>
+                  </CardTitle>
+                  <CardBody>
+                    <SecretProviderClassTable selectedProject={filters.project} />
                   </CardBody>
                 </Card>
               </GridItem>
