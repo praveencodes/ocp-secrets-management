@@ -25,27 +25,33 @@ import { IssuerModel, ClusterIssuerModel } from './components/crds/Issuer';
 import { ExternalSecretModel, ClusterExternalSecretModel } from './components/crds/ExternalSecret';
 import { SecretStoreModel, ClusterSecretStoreModel } from './components/crds/SecretStore';
 import { PushSecretModel, ClusterPushSecretModel } from './components/crds/PushSecret';
-import { SecretProviderClassModel, SecretProviderClassPodStatusModel, SecretProviderClassPodStatus } from './components/crds/SecretProviderClass';
+import {
+  SecretProviderClassModel,
+  SecretProviderClassPodStatusModel,
+  SecretProviderClassPodStatus,
+} from './components/crds/SecretProviderClass';
+import { EventModel, getInvolvedObjectKind, K8sEvent } from './components/crds/Events';
 
 export const ResourceInspect: React.FC = () => {
   const { t } = useTranslation('plugin__ocp-secrets-management');
-  
+
   // State for revealing sensitive data (separate for spec and status)
   const [showSpecSensitiveData, setShowSpecSensitiveData] = React.useState(false);
   const [showStatusSensitiveData, setShowStatusSensitiveData] = React.useState(false);
-  
+
   // Parse URL manually since useParams() isn't working in plugin environment
   const pathname = window.location.pathname;
   const pathParts = pathname.split('/');
-  
+
   // Expected format: /secrets-management/inspect/{resourceType}/{namespace}/{name}
   // or: /secrets-management/inspect/{resourceType}/{name} (for cluster-scoped)
-  const baseIndex = pathParts.findIndex(part => part === 'inspect');
-  const resourceType = baseIndex >= 0 && pathParts.length > baseIndex + 1 ? pathParts[baseIndex + 1] : '';
-  
+  const baseIndex = pathParts.findIndex((part) => part === 'inspect');
+  const resourceType =
+    baseIndex >= 0 && pathParts.length > baseIndex + 1 ? pathParts[baseIndex + 1] : '';
+
   let namespace: string | undefined;
   let name: string;
-  
+
   if (pathParts.length > baseIndex + 3) {
     // Format: /secrets-management/inspect/{resourceType}/{namespace}/{name}
     namespace = pathParts[baseIndex + 2];
@@ -54,8 +60,6 @@ export const ResourceInspect: React.FC = () => {
     // Format: /secrets-management/inspect/{resourceType}/{name} (cluster-scoped)
     name = pathParts[baseIndex + 2] || '';
   }
-
-
 
   const handleBackClick = () => {
     window.history.back();
@@ -90,20 +94,41 @@ export const ResourceInspect: React.FC = () => {
   };
 
   const model = getResourceModel();
-  const isClusterScoped = resourceType === 'clusterissuers' || resourceType === 'clustersecretstores' || resourceType === 'clusterexternalsecrets' || resourceType === 'clusterpushsecrets';
+  const isClusterScoped =
+    resourceType === 'clusterissuers' ||
+    resourceType === 'clustersecretstores' ||
+    resourceType === 'clusterexternalsecrets' ||
+    resourceType === 'clusterpushsecrets';
 
   const [resource, loaded, loadError] = useK8sWatchResource<any>({
     groupVersionKind: model,
     name: name,
-    namespace: isClusterScoped ? undefined : (namespace || 'demo'),
+    namespace: isClusterScoped ? undefined : namespace || 'demo',
     isList: false,
   });
 
   // Watch SecretProviderClassPodStatus resources when inspecting a SecretProviderClass
-  const [podStatuses, podStatusesLoaded, podStatusesError] = useK8sWatchResource<SecretProviderClassPodStatus[]>({
+  const [podStatuses, podStatusesLoaded, podStatusesError] = useK8sWatchResource<
+    SecretProviderClassPodStatus[]
+  >({
     groupVersionKind: SecretProviderClassPodStatusModel,
-    namespace: resourceType === 'secretproviderclasses' ? (namespace || 'demo') : undefined,
+    namespace: resourceType === 'secretproviderclasses' ? namespace || 'demo' : undefined,
     isList: true,
+  });
+
+  // Watch Events for this resource (involvedObject name/kind/namespace)
+  const eventsNamespace = isClusterScoped ? 'default' : namespace || 'default';
+  const involvedKind = getInvolvedObjectKind(resourceType);
+  const eventsFieldSelector = [
+    `involvedObject.name=${name}`,
+    `involvedObject.kind=${involvedKind}`,
+    ...(!isClusterScoped && namespace ? [`involvedObject.namespace=${namespace}`] : []),
+  ].join(',');
+  const [events, eventsLoaded, eventsError] = useK8sWatchResource<K8sEvent[]>({
+    groupVersionKind: EventModel,
+    namespace: eventsNamespace,
+    isList: true,
+    fieldSelector: eventsFieldSelector,
   });
 
   const formatTimestamp = (timestamp: string) => {
@@ -120,35 +145,122 @@ export const ResourceInspect: React.FC = () => {
 
     return (
       <Card>
-        <CardTitle>{t('Metadata')}</CardTitle>
+        <CardTitle style={{ color: 'var(--pf-t--color--blue--30)' }}>{t('Metadata')}</CardTitle>
         <CardBody>
-          <DescriptionList isHorizontal>
-            <DescriptionListGroup>
-              <DescriptionListTerm>{t('Name')}</DescriptionListTerm>
-              <DescriptionListDescription>{resource.metadata.name || '-'}</DescriptionListDescription>
+          <DescriptionList isHorizontal style={{ rowGap: '0.25rem' }}>
+            <DescriptionListGroup
+              style={{
+                display: 'flex',
+                flexDirection: 'row',
+                alignItems: 'baseline',
+                marginBottom: 0,
+              }}
+            >
+              <DescriptionListTerm style={{ minWidth: '16rem', flexShrink: 0 }}>
+                {t('Name:')}
+              </DescriptionListTerm>
+              <DescriptionListDescription style={{ wordBreak: 'break-all', flex: 1 }}>
+                {resource.metadata.name || '-'}
+              </DescriptionListDescription>
             </DescriptionListGroup>
-            {resource.metadata.namespace && (
-              <DescriptionListGroup>
-                <DescriptionListTerm>{t('Namespace')}</DescriptionListTerm>
-                <DescriptionListDescription>{resource.metadata.namespace}</DescriptionListDescription>
+            {resource.kind && (
+              <DescriptionListGroup
+                style={{
+                  display: 'flex',
+                  flexDirection: 'row',
+                  alignItems: 'baseline',
+                  marginBottom: 0,
+                }}
+              >
+                <DescriptionListTerm style={{ minWidth: '16rem', flexShrink: 0 }}>
+                  {t('Kind:')}
+                </DescriptionListTerm>
+                <DescriptionListDescription style={{ wordBreak: 'break-all', flex: 1 }}>
+                  {resource.kind}
+                </DescriptionListDescription>
               </DescriptionListGroup>
             )}
-            <DescriptionListGroup>
-              <DescriptionListTerm>{t('Creation timestamp')}</DescriptionListTerm>
-              <DescriptionListDescription>
+            {resource.metadata.namespace && (
+              <DescriptionListGroup
+                style={{
+                  display: 'flex',
+                  flexDirection: 'row',
+                  alignItems: 'baseline',
+                  marginBottom: 0,
+                }}
+              >
+                <DescriptionListTerm style={{ minWidth: '16rem', flexShrink: 0 }}>
+                  {t('Namespace:')}
+                </DescriptionListTerm>
+                <DescriptionListDescription style={{ wordBreak: 'break-all', flex: 1 }}>
+                  {resource.metadata.namespace}
+                </DescriptionListDescription>
+              </DescriptionListGroup>
+            )}
+            {resource.apiVersion && (
+              <DescriptionListGroup
+                style={{
+                  display: 'flex',
+                  flexDirection: 'row',
+                  alignItems: 'baseline',
+                  marginBottom: 0,
+                }}
+              >
+                <DescriptionListTerm style={{ minWidth: '16rem', flexShrink: 0 }}>
+                  {t('API version:')}
+                </DescriptionListTerm>
+                <DescriptionListDescription style={{ wordBreak: 'break-all', flex: 1 }}>
+                  {resource.apiVersion}
+                </DescriptionListDescription>
+              </DescriptionListGroup>
+            )}
+            <DescriptionListGroup
+              style={{
+                display: 'flex',
+                flexDirection: 'row',
+                alignItems: 'baseline',
+                marginBottom: 0,
+              }}
+            >
+              <DescriptionListTerm style={{ minWidth: '16rem', flexShrink: 0 }}>
+                {t('Creation timestamp:')}
+              </DescriptionListTerm>
+              <DescriptionListDescription style={{ wordBreak: 'break-all', flex: 1 }}>
                 {formatTimestamp(resource.metadata.creationTimestamp)}
               </DescriptionListDescription>
             </DescriptionListGroup>
             {resource.metadata.uid && (
-              <DescriptionListGroup>
-                <DescriptionListTerm>{t('UID')}</DescriptionListTerm>
-                <DescriptionListDescription>{resource.metadata.uid}</DescriptionListDescription>
+              <DescriptionListGroup
+                style={{
+                  display: 'flex',
+                  flexDirection: 'row',
+                  alignItems: 'baseline',
+                  marginBottom: 0,
+                }}
+              >
+                <DescriptionListTerm style={{ minWidth: '16rem', flexShrink: 0 }}>
+                  {t('UID:')}
+                </DescriptionListTerm>
+                <DescriptionListDescription style={{ wordBreak: 'break-all', flex: 1 }}>
+                  {resource.metadata.uid}
+                </DescriptionListDescription>
               </DescriptionListGroup>
             )}
             {resource.metadata.resourceVersion && (
-              <DescriptionListGroup>
-                <DescriptionListTerm>{t('Resource version')}</DescriptionListTerm>
-                <DescriptionListDescription>{resource.metadata.resourceVersion}</DescriptionListDescription>
+              <DescriptionListGroup
+                style={{
+                  display: 'flex',
+                  flexDirection: 'row',
+                  alignItems: 'baseline',
+                  marginBottom: 0,
+                }}
+              >
+                <DescriptionListTerm style={{ minWidth: '16rem', flexShrink: 0 }}>
+                  {t('Resource version:')}
+                </DescriptionListTerm>
+                <DescriptionListDescription style={{ wordBreak: 'break-all', flex: 1 }}>
+                  {resource.metadata.resourceVersion}
+                </DescriptionListDescription>
               </DescriptionListGroup>
             )}
           </DescriptionList>
@@ -162,7 +274,7 @@ export const ResourceInspect: React.FC = () => {
     if (!labels || Object.keys(labels).length === 0) {
       return (
         <Card>
-          <CardTitle>{t('Labels')}</CardTitle>
+          <CardTitle style={{ color: 'var(--pf-t--color--blue--30)' }}>{t('Labels')}</CardTitle>
           <CardBody>
             <em>{t('No labels')}</em>
           </CardBody>
@@ -172,7 +284,7 @@ export const ResourceInspect: React.FC = () => {
 
     return (
       <Card>
-        <CardTitle>{t('Labels')}</CardTitle>
+        <CardTitle style={{ color: 'var(--pf-t--color--blue--30)' }}>{t('Labels')}</CardTitle>
         <CardBody>
           <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
             {Object.entries(labels).map(([key, value]) => (
@@ -191,7 +303,9 @@ export const ResourceInspect: React.FC = () => {
     if (!annotations || Object.keys(annotations).length === 0) {
       return (
         <Card>
-          <CardTitle>{t('Annotations')}</CardTitle>
+          <CardTitle style={{ color: 'var(--pf-t--color--blue--30)' }}>
+            {t('Annotations')}
+          </CardTitle>
           <CardBody>
             <em>{t('No annotations')}</em>
           </CardBody>
@@ -201,13 +315,23 @@ export const ResourceInspect: React.FC = () => {
 
     return (
       <Card>
-        <CardTitle>{t('Annotations')}</CardTitle>
+        <CardTitle style={{ color: 'var(--pf-t--color--blue--30)' }}>{t('Annotations')}</CardTitle>
         <CardBody>
-          <DescriptionList isHorizontal>
+          <DescriptionList isHorizontal style={{ rowGap: '0.25rem' }}>
             {Object.entries(annotations).map(([key, value]) => (
-              <DescriptionListGroup key={key}>
-                <DescriptionListTerm>{key}</DescriptionListTerm>
-                <DescriptionListDescription style={{ wordBreak: 'break-all' }}>
+              <DescriptionListGroup
+                key={key}
+                style={{
+                  display: 'flex',
+                  flexDirection: 'row',
+                  alignItems: 'baseline',
+                  marginBottom: 0,
+                }}
+              >
+                <DescriptionListTerm style={{ minWidth: '16rem', flexShrink: 0 }}>
+                  {key}
+                </DescriptionListTerm>
+                <DescriptionListDescription style={{ wordBreak: 'break-all', flex: 1 }}>
                   {value}
                 </DescriptionListDescription>
               </DescriptionListGroup>
@@ -221,36 +345,61 @@ export const ResourceInspect: React.FC = () => {
   // Function to check if object contains sensitive data
   const containsSensitiveData = (obj: any): boolean => {
     const sensitiveKeys = [
-      'password', 'secret', 'token', 'key', 'privateKey', 'secretKey',
-      'accessKey', 'secretAccessKey', 'clientSecret', 'apiKey', 'auth',
-      'authentication', 'credential', 'cert', 'certificate', 'tls',
+      'password',
+      'secret',
+      'token',
+      'key',
+      'privateKey',
+      'secretKey',
+      'accessKey',
+      'secretAccessKey',
+      'clientSecret',
+      'apiKey',
+      'auth',
+      'authentication',
+      'credential',
+      'cert',
+      'certificate',
+      'tls',
       // SecretProviderClass specific sensitive patterns
-      'tenantId', 'clientId', 'subscriptionId', 'resourceGroup', 'vaultName',
-      'keyVaultName', 'servicePrincipal', 'roleArn', 'region', 'vaultUrl',
-      'vaultAddress', 'vaultNamespace', 'vaultRole', 'vaultPath', 'parameters'
+      'tenantId',
+      'clientId',
+      'subscriptionId',
+      'resourceGroup',
+      'vaultName',
+      'keyVaultName',
+      'servicePrincipal',
+      'roleArn',
+      'region',
+      'vaultUrl',
+      'vaultAddress',
+      'vaultNamespace',
+      'vaultRole',
+      'vaultPath',
+      'parameters',
     ];
-    
+
     const checkObject = (data: any): boolean => {
       if (Array.isArray(data)) {
         return data.some(checkObject);
       }
-      
+
       if (data && typeof data === 'object') {
         for (const [key, value] of Object.entries(data)) {
           const lowerKey = key.toLowerCase();
-          const isSensitive = sensitiveKeys.some(sensitiveKey => 
-            lowerKey.includes(sensitiveKey.toLowerCase())
+          const isSensitive = sensitiveKeys.some((sensitiveKey) =>
+            lowerKey.includes(sensitiveKey.toLowerCase()),
           );
-          
+
           if (isSensitive || checkObject(value)) {
             return true;
           }
         }
       }
-      
+
       return false;
     };
-    
+
     return checkObject(obj);
   };
 
@@ -262,30 +411,32 @@ export const ResourceInspect: React.FC = () => {
 
     return (
       <Card>
-        <CardTitle>
+        <CardTitle style={{ color: 'var(--pf-t--color--blue--30)' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             {t('Specification')}
             {hasSensitiveData && (
               <Switch
                 id="spec-sensitive-toggle"
                 label={showSpecSensitiveData ? t('Hide sensitive data') : t('Show sensitive data')}
-                isChecked={!showSpecSensitiveData}
-                onChange={(event, checked) => setShowSpecSensitiveData(!checked)}
+                isChecked={showSpecSensitiveData}
+                onChange={(event, checked) => setShowSpecSensitiveData(checked)}
                 ouiaId="SpecificationSensitiveToggle"
               />
             )}
           </div>
         </CardTitle>
         <CardBody>
-          <pre style={{ 
-            padding: '16px', 
-            borderRadius: '4px',
-            overflow: 'auto',
-            fontSize: '12px',
-            maxHeight: '400px',
-            border: '1px solid #d2d2d2'
-          }}>
-            {shouldHideContent ? '...' : JSON.stringify(resource.spec, null, 2)}
+          <pre
+            style={{
+              padding: '16px',
+              borderRadius: '4px',
+              overflow: 'auto',
+              fontSize: '12px',
+              maxHeight: '400px',
+              border: '1px solid #d2d2d2',
+            }}
+          >
+            {shouldHideContent ? '********' : JSON.stringify(resource.spec, null, 2)}
           </pre>
         </CardBody>
       </Card>
@@ -300,13 +451,15 @@ export const ResourceInspect: React.FC = () => {
 
     return (
       <Card>
-        <CardTitle>
+        <CardTitle style={{ color: 'var(--pf-t--color--blue--30)' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             {t('Status')}
             {hasSensitiveData && (
               <Switch
                 id="status-sensitive-toggle"
-                label={showStatusSensitiveData ? t('Hide sensitive data') : t('Show sensitive data')}
+                label={
+                  showStatusSensitiveData ? t('Hide sensitive data') : t('Show sensitive data')
+                }
                 isChecked={!showStatusSensitiveData}
                 onChange={(event, checked) => setShowStatusSensitiveData(!checked)}
                 ouiaId="StatusSensitiveToggle"
@@ -315,14 +468,16 @@ export const ResourceInspect: React.FC = () => {
           </div>
         </CardTitle>
         <CardBody>
-          <pre style={{ 
-            padding: '16px', 
-            borderRadius: '4px',
-            overflow: 'auto',
-            fontSize: '12px',
-            maxHeight: '400px',
-            border: '1px solid #d2d2d2'
-          }}>
+          <pre
+            style={{
+              padding: '16px',
+              borderRadius: '4px',
+              overflow: 'auto',
+              fontSize: '12px',
+              maxHeight: '400px',
+              border: '1px solid #d2d2d2',
+            }}
+          >
             {shouldHideContent ? '...' : JSON.stringify(resource.status, null, 2)}
           </pre>
         </CardBody>
@@ -335,13 +490,15 @@ export const ResourceInspect: React.FC = () => {
 
     // Filter pod statuses that reference this SecretProviderClass
     const relevantPodStatuses = (podStatuses || []).filter(
-      podStatus => podStatus.status.secretProviderClassName === resource.metadata.name
+      (podStatus) => podStatus.status.secretProviderClassName === resource.metadata.name,
     );
 
     if (relevantPodStatuses.length === 0) {
       return (
         <Card>
-          <CardTitle>{t('Pod Statuses')}</CardTitle>
+          <CardTitle style={{ color: 'var(--pf-t--color--blue--30)' }}>
+            {t('Pod Statuses')}
+          </CardTitle>
           <CardBody>
             <p>{t('No pods are currently using this SecretProviderClass.')}</p>
           </CardBody>
@@ -351,7 +508,9 @@ export const ResourceInspect: React.FC = () => {
 
     return (
       <Card>
-        <CardTitle>{t('Pod Statuses')} ({relevantPodStatuses.length})</CardTitle>
+        <CardTitle style={{ color: 'var(--pf-t--color--blue--30)' }}>
+          {t('Pod Statuses')} ({relevantPodStatuses.length})
+        </CardTitle>
         <CardBody>
           <div style={{ overflowX: 'auto' }}>
             <table className="pf-c-table pf-m-compact pf-m-grid-md" style={{ width: '100%' }}>
@@ -367,8 +526,8 @@ export const ResourceInspect: React.FC = () => {
                   <tr key={podStatus.metadata.name}>
                     <td>{podStatus.status.podName || podStatus.metadata.name}</td>
                     <td>
-                      <Label 
-                        color={podStatus.status.mounted ? 'green' : 'red'} 
+                      <Label
+                        color={podStatus.status.mounted ? 'green' : 'red'}
                         icon={podStatus.status.mounted ? <CheckCircleIcon /> : <TimesCircleIcon />}
                       >
                         {podStatus.status.mounted ? t('Yes') : t('No')}
@@ -380,6 +539,74 @@ export const ResourceInspect: React.FC = () => {
               </tbody>
             </table>
           </div>
+        </CardBody>
+      </Card>
+    );
+  };
+
+  const renderEvents = () => {
+    if (!resource) return null;
+    const list = events ?? [];
+    const sorted = [...list].sort((a, b) => {
+      const tA = a.lastTimestamp || a.firstTimestamp || a.metadata?.creationTimestamp || '';
+      const tB = b.lastTimestamp || b.firstTimestamp || b.metadata?.creationTimestamp || '';
+      return tB.localeCompare(tA);
+    });
+
+    return (
+      <Card>
+        <CardTitle style={{ color: 'var(--pf-t--color--blue--30)' }}>
+          {t('Events')} {eventsLoaded && `(${sorted.length})`}
+        </CardTitle>
+        <CardBody>
+          {!eventsLoaded && <em>{t('Loading events...')}</em>}
+          {eventsLoaded && eventsError && (
+            <Alert variant={AlertVariant.warning} isInline title={t('Could not load events')}>
+              {eventsError?.message || String(eventsError)}
+            </Alert>
+          )}
+          {eventsLoaded && !eventsError && sorted.length === 0 && <em>{t('No events')}</em>}
+          {eventsLoaded && !eventsError && sorted.length > 0 && (
+            <div style={{ overflowX: 'auto' }}>
+              <table className="pf-c-table pf-m-compact pf-m-grid-md" style={{ width: '100%' }}>
+                <thead>
+                  <tr>
+                    <th>{t('Type')}</th>
+                    <th>{t('Reason')}</th>
+                    <th>{t('Message')}</th>
+                    <th>{t('Count')}</th>
+                    <th>{t('Last seen')}</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {sorted.map((evt) => (
+                    <tr key={evt.metadata?.name ?? evt.reason ?? ''}>
+                      <td>
+                        <Label color={evt.type === 'Warning' ? 'orange' : 'blue'}>
+                          {evt.type || 'Normal'}
+                        </Label>
+                      </td>
+                      <td>{evt.reason ?? '-'}</td>
+                      <td
+                        style={{ maxWidth: '20rem', overflow: 'hidden', textOverflow: 'ellipsis' }}
+                        title={evt.message}
+                      >
+                        {evt.message ?? '-'}
+                      </td>
+                      <td>{evt.count ?? 1}</td>
+                      <td>
+                        {formatTimestamp(
+                          evt.lastTimestamp ||
+                            evt.firstTimestamp ||
+                            evt.metadata?.creationTimestamp,
+                        )}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
         </CardBody>
       </Card>
     );
@@ -405,6 +632,8 @@ export const ResourceInspect: React.FC = () => {
         return t('PushSecret');
       case 'clusterpushsecrets':
         return t('ClusterPushSecret');
+      case 'secretproviderclasses':
+        return t('SecretProviderClass');
       default:
         return t('Resource');
     }
@@ -422,7 +651,7 @@ export const ResourceInspect: React.FC = () => {
 
   // For SecretProviderClass, also wait for pod statuses to load
   const allLoaded = resourceType === 'secretproviderclasses' ? loaded && podStatusesLoaded : loaded;
-  
+
   if (!allLoaded) {
     return (
       <div className="co-m-loader co-an-fade-in-out">
@@ -434,16 +663,13 @@ export const ResourceInspect: React.FC = () => {
   }
 
   // Handle errors from both resource and pod status loading
-  const anyError = loadError || (resourceType === 'secretproviderclasses' ? podStatusesError : null);
-  
+  const anyError =
+    loadError || (resourceType === 'secretproviderclasses' ? podStatusesError : null);
+
   if (anyError) {
     return (
       <div className="co-m-pane__body">
-        <Alert 
-          variant={AlertVariant.danger} 
-          title={t('Error loading resource')} 
-          isInline
-        >
+        <Alert variant={AlertVariant.danger} title={t('Error loading resource')} isInline>
           {anyError.message}
         </Alert>
       </div>
@@ -453,14 +679,10 @@ export const ResourceInspect: React.FC = () => {
   if (!resource) {
     return (
       <div className="co-m-pane__body">
-        <Alert 
-          variant={AlertVariant.warning} 
-          title={t('Resource not found')} 
-          isInline
-        >
-          {t('The {resourceType} "{name}" was not found.', { 
-            resourceType: getResourceTypeDisplayName(), 
-            name 
+        <Alert variant={AlertVariant.warning} title={t('Resource not found')} isInline>
+          {t('The {resourceType} "{name}" was not found.', {
+            resourceType: getResourceTypeDisplayName(),
+            name,
           })}
         </Alert>
       </div>
@@ -472,42 +694,39 @@ export const ResourceInspect: React.FC = () => {
       <Helmet>
         <title>{t('{resourceType} details', { resourceType: getResourceTypeDisplayName() })}</title>
       </Helmet>
-      
+
       <div className="co-m-pane__body">
         <div className="co-m-pane__heading">
           <div className="co-m-pane__name co-resource-item">
-            <Button
-              variant="plain"
-              onClick={handleBackClick}
-              style={{ marginRight: '16px' }}
-            >
+            <Button variant="plain" onClick={handleBackClick} style={{ marginRight: '16px' }}>
               <ArrowLeftIcon />
             </Button>
             <KeyIcon className="co-m-resource-icon" style={{ marginRight: '8px' }} />
-            <Title headingLevel="h1" size="2xl">
+            <Title headingLevel="h1" size="lg">
               {getResourceTypeDisplayName()}: {name}
             </Title>
           </div>
         </div>
 
         <Grid hasGutter>
-          <GridItem span={12}>
+          <GridItem span={12} style={{ padding: '0rem 2rem' }}>
             {renderMetadata()}
           </GridItem>
-          <GridItem span={6}>
+          <GridItem span={6} style={{ paddingLeft: '2rem' }}>
             {renderLabels()}
           </GridItem>
-          <GridItem span={6}>
+          <GridItem span={6} style={{ paddingRight: '2rem' }}>
             {renderAnnotations()}
           </GridItem>
-          <GridItem span={6}>
+          <GridItem span={6} style={{ paddingLeft: '2rem' }}>
             {renderSpecification()}
           </GridItem>
-          <GridItem span={6}>
-            {renderStatus()}
+          <GridItem span={6}>{renderStatus()}</GridItem>
+          <GridItem span={12} style={{ padding: '0rem 2rem' }}>
+            {renderEvents()}
           </GridItem>
           {resourceType === 'secretproviderclasses' && (
-            <GridItem span={12}>
+            <GridItem span={12} style={{ padding: '0rem 2rem' }}>
               {renderSecretProviderClassPodStatuses()}
             </GridItem>
           )}
@@ -516,4 +735,3 @@ export const ResourceInspect: React.FC = () => {
     </>
   );
 };
-

@@ -22,7 +22,7 @@ export interface SecretStore {
     provider: {
       aws?: { service: string; region?: string };
       azurekv?: { vaultUrl: string };
-      gcpsm?: { projectId: string };
+      gcpsm?: { projectID: string };
       vault?: { server: string };
       kubernetes?: { server?: string };
       doppler?: { apiUrl?: string };
@@ -40,4 +40,3 @@ export interface SecretStore {
     }>;
   };
 }
-

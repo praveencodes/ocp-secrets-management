@@ -162,9 +162,8 @@ export const IssuersTable: React.FC<IssuersTableProps> = ({ selectedProject }) =
 
   const columns = [
     { title: t('Name'), width: 14 },
-    { title: t('Namespace'), width: 12 },
     { title: t('Type'), width: 10 },
-    { title: t('Scope'), width: 10 },
+    { title: t('Namespace'), width: 12 },
     { title: t('Issuer Type'), width: 12 },
     { title: t('Details'), width: 22 },
     { title: t('Status'), width: 10 },
@@ -196,9 +195,8 @@ export const IssuersTable: React.FC<IssuersTableProps> = ({ selectedProject }) =
       return {
         cells: [
           issuer.metadata.name,
-          issuer.metadata.namespace || 'Cluster',
           issuer.scope === 'Namespace' ? 'Issuer' : 'ClusterIssuer',
-          issuer.scope,
+          issuer.metadata.namespace || 'Cluster',
           issuerType,
           details,
           (
@@ -252,7 +250,12 @@ export const IssuersTable: React.FC<IssuersTableProps> = ({ selectedProject }) =
         loading={!loaded}
         error={loadError?.message}
         emptyStateTitle={t('No issuers found')}
-        emptyStateBody={t('No cert-manager issuers are currently available in the demo project or cluster.')}
+        emptyStateBody={
+          selectedProject === 'all'
+            ? t('No issuers are currently available in all projects.')
+            : t('No issuers are currently available in the project {{project}}.', { project: selectedProject })
+        }
+        selectedProject={selectedProject}
         data-test="issuers-table"
       />
       

@@ -177,8 +177,8 @@ export const ExternalSecretsTable: React.FC<ExternalSecretsTableProps> = ({ sele
 
   const columns = [
     { title: t('Name'), width: 15 },
-    { title: t('Type'), width: 9 },
-    { title: t('Namespace'), width: 10 },
+    { title: t('Type'), width: 14 },
+    { title: t('Namespace'), width: 12 },
     { title: t('Target Secret'), width: 14 },
     { title: t('Secret Store'), width: 20 },
     { title: t('Refresh Interval'), width: 12 },
@@ -214,7 +214,7 @@ export const ExternalSecretsTable: React.FC<ExternalSecretsTableProps> = ({ sele
       }
       
       const secretId = `${isCluster ? 'cluster' : resource.metadata.namespace}-${resource.metadata.name}`;
-      const resourceType = isCluster ? 'Cluster' : 'Namespaced';
+      const resourceType = isCluster ? 'ClusterExternalSecret' : 'ExternalSecret';
       const namespace = isCluster ? 'Cluster-wide' : resource.metadata.namespace;
       
       return {
@@ -276,7 +276,12 @@ export const ExternalSecretsTable: React.FC<ExternalSecretsTableProps> = ({ sele
         loading={!loaded}
         error={loadError?.message}
         emptyStateTitle={t('No external secrets found')}
-        emptyStateBody={t('No external-secrets-operator ExternalSecrets are currently available in the demo project.')}
+        emptyStateBody={
+          selectedProject === 'all'
+            ? t('No ExternalSecrets are currently available in all projects.')
+            : t('No ExternalSecrets are currently available in the project {{project}}.', { project: selectedProject })
+        }
+        selectedProject={selectedProject}
         data-test="external-secrets-table"
       />
       

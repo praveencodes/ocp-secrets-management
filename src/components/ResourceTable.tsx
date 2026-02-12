@@ -25,6 +25,8 @@ interface ResourceTableProps {
   error?: string;
   emptyStateTitle?: string;
   emptyStateBody?: string;
+  /** When set, fallback empty state body is project-aware (e.g. "in project X" vs "in the demo project"). */
+  selectedProject?: string;
   'data-test'?: string;
 }
 
@@ -35,9 +37,15 @@ export const ResourceTable: React.FC<ResourceTableProps> = ({
   error,
   emptyStateTitle,
   emptyStateBody,
+  selectedProject,
   'data-test': dataTest,
 }) => {
   const { t } = useTranslation('plugin__ocp-secrets-management');
+
+  const defaultEmptyStateBody =
+    selectedProject && selectedProject !== 'all'
+      ? t('No resources of this type are currently available in project {{project}}.', { project: selectedProject })
+      : t('No resources of this type are currently available in the demo project.');
 
   if (loading) {
     return (
@@ -72,7 +80,7 @@ export const ResourceTable: React.FC<ResourceTableProps> = ({
             {emptyStateTitle || t('No resources found')}
           </Title>
           <EmptyStateBody>
-            {emptyStateBody || t('No resources of this type are currently available in the demo project.')}
+            {emptyStateBody ?? defaultEmptyStateBody}
           </EmptyStateBody>
         </EmptyState>
       </div>

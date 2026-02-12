@@ -207,7 +207,12 @@ export const CertificatesTable: React.FC<CertificatesTableProps> = ({ selectedPr
         loading={!loaded}
         error={loadError?.message}
         emptyStateTitle={t('No certificates found')}
-        emptyStateBody={t('No cert-manager certificates are currently available in the demo project.')}
+        emptyStateBody={
+          selectedProject === 'all'
+            ? t('No certificates are currently available in all projects.')
+            : t('No certificates are currently available in the project {{project}}.', { project: selectedProject })
+        }
+        selectedProject={selectedProject}
         data-test="certificates-table"
       />
       

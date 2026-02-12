@@ -37,7 +37,7 @@ const getProviderDetails = (secretStore: SecretStore): string => {
   const provider = secretStore.spec.provider;
   if (provider.aws) return `${provider.aws.service} (${provider.aws.region || 'default'})`;
   if (provider.azurekv) return provider.azurekv.vaultUrl;
-  if (provider.gcpsm) return provider.gcpsm.projectId;
+  if (provider.gcpsm) return provider.gcpsm.projectID;
   if (provider.vault) return provider.vault.server;
   if (provider.kubernetes) return provider.kubernetes.server || 'In-cluster';
   if (provider.doppler) return provider.doppler.apiUrl || 'Default API';
@@ -189,9 +189,8 @@ export const SecretStoresTable: React.FC<SecretStoresTableProps> = ({ selectedPr
 
   const columns = [
     { title: t('Name'), width: 14 },
-    { title: t('Namespace'), width: 12 },
     { title: t('Type'), width: 10 },
-    { title: t('Scope'), width: 8 },
+    { title: t('Namespace'), width: 12 },
     { title: t('Provider'), width: 14 },
     { title: t('Details'), width: 22 },
     { title: t('Status'), width: 10 },
@@ -211,13 +210,14 @@ export const SecretStoresTable: React.FC<SecretStoresTableProps> = ({ selectedPr
       const providerType = getProviderType(secretStore);
       const providerDetails = getProviderDetails(secretStore);
       const storeId = `${secretStore.metadata.namespace || 'cluster'}-${secretStore.metadata.name}`;
+      const typeLabel = secretStore.scope === 'Cluster' ? t('ClusterSecretStore') : t('SecretStore');
+      const namespace = secretStore.metadata.namespace || 'Cluster-wide';
       
       return {
         cells: [
           secretStore.metadata.name,
-          secretStore.metadata.namespace || 'Cluster',
-          secretStore.scope === 'Namespace' ? 'SecretStore' : 'ClusterSecretStore',
-          secretStore.scope,
+          typeLabel,
+          namespace,
           providerType,
           providerDetails,
           (
@@ -271,7 +271,12 @@ export const SecretStoresTable: React.FC<SecretStoresTableProps> = ({ selectedPr
         loading={!loaded}
         error={loadError?.message}
         emptyStateTitle={t('No secret stores found')}
-        emptyStateBody={t('No external-secrets-operator SecretStores are currently available in the demo project or cluster.')}
+        emptyStateBody={
+          selectedProject === 'all'
+            ? t('No SecretStores are currently available in all projects.')
+            : t('No SecretStores are currently available in the project {{project}}.', { project: selectedProject })
+        }
+        selectedProject={selectedProject}
         data-test="secret-stores-table"
       />
       
