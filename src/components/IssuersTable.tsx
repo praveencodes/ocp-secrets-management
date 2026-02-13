@@ -161,12 +161,13 @@ export const IssuersTable: React.FC<IssuersTableProps> = ({ selectedProject }) =
   const loadError = issuersError || clusterIssuersError;
 
   const columns = [
-    { title: t('Name'), width: 14 },
-    { title: t('Type'), width: 10 },
-    { title: t('Namespace'), width: 12 },
-    { title: t('Issuer Type'), width: 12 },
-    { title: t('Details'), width: 22 },
-    { title: t('Status'), width: 10 },
+    { title: t('Name'), width: 12 },
+    { title: t('Type'), width: 9 },
+    { title: t('Namespace'), width: 11 },
+    { title: t('Issuer Type'), width: 11 },
+    { title: t('Details'), width: 20 },
+    { title: t('Expiry Date'), width: 10 },
+    { title: t('Status'), width: 9 },
     { title: '', width: 10 }, // Actions column
   ];
 
@@ -192,6 +193,11 @@ export const IssuersTable: React.FC<IssuersTableProps> = ({ selectedProject }) =
         details = issuer.spec.vault.server;
       }
       
+      const expiryDate =
+        issuer.metadata.annotations?.['expiry-date'] ??
+        issuer.metadata.annotations?.['expiryDate'] ??
+        '-';
+
       return {
         cells: [
           issuer.metadata.name,
@@ -199,6 +205,7 @@ export const IssuersTable: React.FC<IssuersTableProps> = ({ selectedProject }) =
           issuer.metadata.namespace || 'Cluster',
           issuerType,
           details,
+          expiryDate,
           (
             <Label color={conditionStatus.color as any} icon={conditionStatus.icon}>
               {conditionStatus.status}

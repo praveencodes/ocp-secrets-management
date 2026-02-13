@@ -50,7 +50,7 @@ const getSecretProviderClassStatus = (
   spc: SecretProviderClass,
   podStatuses: SecretProviderClassPodStatus[],
 ) => {
-  // Find pod statuses for this SecretProviderClass
+  // Find pod statuses for this SecretProviderClass; skip entries without status.
   const relevantPodStatuses = podStatuses.filter(
     (podStatus) => podStatus?.status?.secretProviderClassName === spc.metadata.name,
   );
@@ -59,8 +59,10 @@ const getSecretProviderClassStatus = (
     return { status: 'Unknown', icon: <ExclamationCircleIcon />, color: 'orange' };
   }
 
-  // Check if any pod has this SecretProviderClass mounted
-  const mountedPods = relevantPodStatuses.filter((podStatus) => podStatus.status.mounted === true);
+  // Check if any pod has this SecretProviderClass mounted (guard against missing status)
+  const mountedPods = relevantPodStatuses.filter(
+    (podStatus) => podStatus.status?.mounted === true,
+  );
 
   if (mountedPods.length > 0) {
     return { status: 'Ready', icon: <CheckCircleIcon />, color: 'green' };
@@ -157,12 +159,13 @@ export const SecretProviderClassTable: React.FC<SecretProviderClassTableProps> =
   const loadError = spcLoadError || podStatusesLoadError;
 
   const columns = [
-    { title: t('Name'), width: 16 },
-    { title: t('Namespace'), width: 12 },
-    { title: t('Provider'), width: 12 },
-    { title: t('Secret Objects'), width: 14 },
-    { title: t('Parameters'), width: 24 },
-    { title: t('Status'), width: 12 },
+    { title: t('Name'), width: 14 },
+    { title: t('Namespace'), width: 11 },
+    { title: t('Provider'), width: 11 },
+    { title: t('Secret Objects'), width: 12 },
+    { title: t('Parameters'), width: 22 },
+    { title: t('Expiry Date'), width: 10 },
+    { title: t('Status'), width: 11 },
     { title: '', width: 10 }, // Actions column
   ];
 
@@ -187,6 +190,10 @@ export const SecretProviderClassTable: React.FC<SecretProviderClassTableProps> =
         parameterKeys.length > 0
           ? `${parameterKeys.length} parameter${parameterKeys.length > 1 ? 's' : ''}`
           : 'None';
+      const expiryDate =
+        spc.metadata.annotations?.['expiry-date'] ??
+        spc.metadata.annotations?.['expiryDate'] ??
+        '-';
 
       return {
         cells: [
@@ -197,6 +204,7 @@ export const SecretProviderClassTable: React.FC<SecretProviderClassTableProps> =
           </span>,
           secretObjectsText,
           parametersText,
+          expiryDate,
           <Label color={conditionStatus.color as any} icon={conditionStatus.icon}>
             {conditionStatus.status}
           </Label>,

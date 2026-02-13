@@ -188,12 +188,13 @@ export const SecretStoresTable: React.FC<SecretStoresTableProps> = ({ selectedPr
   const loadError = secretStoresError || clusterSecretStoresError;
 
   const columns = [
-    { title: t('Name'), width: 14 },
-    { title: t('Type'), width: 10 },
-    { title: t('Namespace'), width: 12 },
-    { title: t('Provider'), width: 14 },
-    { title: t('Details'), width: 22 },
-    { title: t('Status'), width: 10 },
+    { title: t('Name'), width: 12 },
+    { title: t('Type'), width: 9 },
+    { title: t('Namespace'), width: 11 },
+    { title: t('Provider'), width: 12 },
+    { title: t('Details'), width: 20 },
+    { title: t('Expiry Date'), width: 10 },
+    { title: t('Status'), width: 9 },
     { title: '', width: 10 }, // Actions column
   ];
 
@@ -212,7 +213,11 @@ export const SecretStoresTable: React.FC<SecretStoresTableProps> = ({ selectedPr
       const storeId = `${secretStore.metadata.namespace || 'cluster'}-${secretStore.metadata.name}`;
       const typeLabel = secretStore.scope === 'Cluster' ? t('ClusterSecretStore') : t('SecretStore');
       const namespace = secretStore.metadata.namespace || 'Cluster-wide';
-      
+      const expiryDate =
+        secretStore.metadata.annotations?.['expiry-date'] ??
+        secretStore.metadata.annotations?.['expiryDate'] ??
+        '-';
+
       return {
         cells: [
           secretStore.metadata.name,
@@ -220,6 +225,7 @@ export const SecretStoresTable: React.FC<SecretStoresTableProps> = ({ selectedPr
           namespace,
           providerType,
           providerDetails,
+          expiryDate,
           (
             <Label color={conditionStatus.color as any} icon={conditionStatus.icon}>
               {conditionStatus.status}

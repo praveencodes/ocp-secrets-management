@@ -132,12 +132,13 @@ export const CertificatesTable: React.FC<CertificatesTableProps> = ({ selectedPr
   });
 
   const columns = [
-    { title: t('Name'), width: 16 },
-    { title: t('Namespace'), width: 10 },
-    { title: t('Secret'), width: 16 },
-    { title: t('Issuer'), width: 16 },
-    { title: t('DNS Names'), width: 20 },
-    { title: t('Status'), width: 12 },
+    { title: t('Name'), width: 14 },
+    { title: t('Namespace'), width: 9 },
+    { title: t('Secret'), width: 14 },
+    { title: t('Issuer'), width: 14 },
+    { title: t('DNS Names'), width: 18 },
+    { title: t('Expiry Date'), width: 10 },
+    { title: t('Status'), width: 11 },
     { title: '', width: 10 }, // Actions column
   ];
 
@@ -149,6 +150,11 @@ export const CertificatesTable: React.FC<CertificatesTableProps> = ({ selectedPr
       const dnsNames = cert.spec.dnsNames?.join(', ') || cert.spec.commonName || '-';
       const certId = `${cert.metadata.namespace}-${cert.metadata.name}`;
       
+      const expiryDate =
+        cert.metadata.annotations?.['expiry-date'] ??
+        cert.metadata.annotations?.['expiryDate'] ??
+        '-';
+
       return {
         cells: [
           cert.metadata.name,
@@ -156,6 +162,7 @@ export const CertificatesTable: React.FC<CertificatesTableProps> = ({ selectedPr
           cert.spec.secretName,
           `${cert.spec.issuerRef.name} (${cert.spec.issuerRef.kind})`,
           dnsNames,
+          expiryDate,
           (
             <Label color={conditionStatus.color as any} icon={conditionStatus.icon}>
               {conditionStatus.status}

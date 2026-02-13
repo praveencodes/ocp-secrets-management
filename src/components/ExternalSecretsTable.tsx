@@ -176,13 +176,14 @@ export const ExternalSecretsTable: React.FC<ExternalSecretsTableProps> = ({ sele
   const loadError = externalSecretsError || clusterExternalSecretsError;
 
   const columns = [
-    { title: t('Name'), width: 15 },
-    { title: t('Type'), width: 14 },
-    { title: t('Namespace'), width: 12 },
-    { title: t('Target Secret'), width: 14 },
-    { title: t('Secret Store'), width: 20 },
-    { title: t('Refresh Interval'), width: 12 },
-    { title: t('Status'), width: 10 },
+    { title: t('Name'), width: 14 },
+    { title: t('Type'), width: 12 },
+    { title: t('Namespace'), width: 11 },
+    { title: t('Target Secret'), width: 13 },
+    { title: t('Secret Store'), width: 18 },
+    { title: t('Refresh Interval'), width: 11 },
+    { title: t('Expiry Date'), width: 10 },
+    { title: t('Status'), width: 9 },
     { title: '', width: 10 }, // Actions column
   ];
 
@@ -216,7 +217,11 @@ export const ExternalSecretsTable: React.FC<ExternalSecretsTableProps> = ({ sele
       const secretId = `${isCluster ? 'cluster' : resource.metadata.namespace}-${resource.metadata.name}`;
       const resourceType = isCluster ? 'ClusterExternalSecret' : 'ExternalSecret';
       const namespace = isCluster ? 'Cluster-wide' : resource.metadata.namespace;
-      
+      const expiryDate =
+        resource.metadata.annotations?.['expiry-date'] ??
+        resource.metadata.annotations?.['expiryDate'] ??
+        '-';
+
       return {
         cells: [
           resource.metadata.name,
@@ -225,6 +230,7 @@ export const ExternalSecretsTable: React.FC<ExternalSecretsTableProps> = ({ sele
           targetSecret,
           secretStore,
           refreshInterval,
+          expiryDate,
           (
             <Label color={conditionStatus.color as any} icon={conditionStatus.icon}>
               {conditionStatus.status}
