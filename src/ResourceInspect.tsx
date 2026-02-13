@@ -36,6 +36,7 @@ import { dump as yamlDump } from 'js-yaml';
 // YAML syntax colors (on black background): blue (keys), mustard yellow (values)
 const YAML_KEY_COLOR = '#60a5fa';
 const YAML_VALUE_COLOR = '#eab308';
+const HIDDEN_VALUE_PLACEHOLDER = '********';
 
 function colorizeYaml(yamlString: string): React.ReactNode {
   const lines = yamlString.split('\n');
@@ -64,7 +65,6 @@ function colorizeYaml(yamlString: string): React.ReactNode {
             <span key={i}>
               {indent}
               <span style={{ color: YAML_KEY_COLOR }}>{dash.trim() || '-'}</span>
-              {' '}
               <span style={{ color: YAML_VALUE_COLOR }}>{rest}</span>
               {'\n'}
             </span>
@@ -394,10 +394,7 @@ export const ResourceInspect: React.FC = () => {
       <Card style={cardStyle}>
         <CardTitle style={{ color: 'var(--pf-t--color--blue--30)' }}>{t('Annotations')}</CardTitle>
         <CardBody>
-          <DescriptionList
-            isHorizontal
-            style={{ rowGap: '0.25rem', background: '#1e1e1e' }}
-          >
+          <DescriptionList isHorizontal style={{ rowGap: '0.25rem', background: '#1e1e1e' }}>
             {Object.entries(annotations).map(([key, value]) => (
               <DescriptionListGroup
                 key={key}
@@ -518,7 +515,7 @@ export const ResourceInspect: React.FC = () => {
             }}
           >
             {shouldHideContent ? (
-              <span style={{ color: YAML_VALUE_COLOR }}>********</span>
+              <span style={{ color: YAML_VALUE_COLOR }}>{HIDDEN_VALUE_PLACEHOLDER}</span>
             ) : (
               colorizeYaml(yamlDump(resource.spec, { lineWidth: -1 }))
             )}
@@ -568,7 +565,7 @@ export const ResourceInspect: React.FC = () => {
             }}
           >
             {shouldHideContent ? (
-              <span style={{ color: YAML_VALUE_COLOR }}>...</span>
+              <span style={{ color: YAML_VALUE_COLOR }}>{HIDDEN_VALUE_PLACEHOLDER}</span>
             ) : (
               colorizeYaml(yamlDump(resource.status, { lineWidth: -1 }))
             )}
