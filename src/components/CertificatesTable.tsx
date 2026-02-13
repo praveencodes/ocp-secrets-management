@@ -1,8 +1,9 @@
 import * as React from 'react';
 import { useTranslation } from 'react-i18next';
 
-import { 
-  Label, 
+import {
+  Label,
+  LabelProps,
   Dropdown,
   DropdownItem,
   DropdownList,
@@ -14,24 +15,29 @@ import {
   Alert,
   AlertVariant,
 } from '@patternfly/react-core';
-import { CheckCircleIcon, ExclamationCircleIcon, TimesCircleIcon, EllipsisVIcon } from '@patternfly/react-icons';
+import {
+  CheckCircleIcon,
+  ExclamationCircleIcon,
+  TimesCircleIcon,
+  EllipsisVIcon,
+} from '@patternfly/react-icons';
 import { ResourceTable } from './ResourceTable';
 import { useK8sWatchResource, consoleFetch } from '@openshift-console/dynamic-plugin-sdk';
-import { CertificateModel, Certificate } from './crds/Certificate';
+import { CertificateModel, Certificate } from './crds';
 
 const getConditionStatus = (certificate: Certificate) => {
   const readyCondition = certificate.status?.conditions?.find(
-    (condition) => condition.type === 'Ready'
+    (condition) => condition.type === 'Ready',
   );
-  
+
   if (!readyCondition) {
     return { status: 'Unknown', icon: <ExclamationCircleIcon />, color: 'orange' };
   }
-  
+
   if (readyCondition.status === 'True') {
     return { status: 'Ready', icon: <CheckCircleIcon />, color: 'green' };
   }
-  
+
   return { status: 'Not Ready', icon: <TimesCircleIcon />, color: 'red' };
 };
 
@@ -53,11 +59,11 @@ export const CertificatesTable: React.FC<CertificatesTableProps> = ({ selectedPr
     isDeleting: false,
     error: null,
   });
-  
+
   const toggleDropdown = (certId: string) => {
-    setOpenDropdowns(prev => ({
+    setOpenDropdowns((prev) => ({
       ...prev,
-      [certId]: !prev[certId]
+      [certId]: !prev[certId],
     }));
   };
 
@@ -78,27 +84,27 @@ export const CertificatesTable: React.FC<CertificatesTableProps> = ({ selectedPr
 
   const confirmDelete = async () => {
     if (!deleteModal.certificate) return;
-    
-    setDeleteModal(prev => ({ ...prev, isDeleting: true, error: null }));
-    
+
+    setDeleteModal((prev) => ({ ...prev, isDeleting: true, error: null }));
+
     try {
       // Manual delete using fetch to bypass k8sDelete API path issues
       const resourceName = deleteModal.certificate?.metadata?.name;
       const resourceNamespace = deleteModal.certificate?.metadata?.namespace;
       const apiPath = `/api/kubernetes/apis/cert-manager.io/v1/namespaces/${resourceNamespace}/certificates/${resourceName}`;
-      
+
       const response = await consoleFetch(apiPath, {
         method: 'DELETE',
         headers: {
           'Content-Type': 'application/json',
         },
       });
-      
+
       if (!response.ok) {
         const errorText = await response.text();
         throw new Error(`Delete failed: ${response.status} ${response.statusText} - ${errorText}`);
       }
-      
+
       // Close modal on success
       setDeleteModal({
         isOpen: false,
@@ -106,12 +112,11 @@ export const CertificatesTable: React.FC<CertificatesTableProps> = ({ selectedPr
         isDeleting: false,
         error: null,
       });
-    } catch (error: any) {
-
-      setDeleteModal(prev => ({
+    } catch (error: unknown) {
+      setDeleteModal((prev) => ({
         ...prev,
         isDeleting: false,
-        error: error.message || 'Failed to delete certificate',
+        error: error instanceof Error ? error.message : 'Failed to delete certificate',
       }));
     }
   };
@@ -144,12 +149,11 @@ export const CertificatesTable: React.FC<CertificatesTableProps> = ({ selectedPr
 
   const rows = React.useMemo(() => {
     if (!loaded || !certificates) return [];
-    
+
     return certificates.map((cert) => {
       const conditionStatus = getConditionStatus(cert);
       const dnsNames = cert.spec.dnsNames?.join(', ') || cert.spec.commonName || '-';
       const certId = `${cert.metadata.namespace}-${cert.metadata.name}`;
-      
       const expiryDate =
         cert.metadata.annotations?.['expiry-date'] ??
         cert.metadata.annotations?.['expiryDate'] ??
@@ -163,44 +167,39 @@ export const CertificatesTable: React.FC<CertificatesTableProps> = ({ selectedPr
           `${cert.spec.issuerRef.name} (${cert.spec.issuerRef.kind})`,
           dnsNames,
           expiryDate,
-          (
-            <Label color={conditionStatus.color as any} icon={conditionStatus.icon}>
-              {conditionStatus.status}
-            </Label>
-          ),
-          (
-            <Dropdown
-              isOpen={openDropdowns[certId] || false}
-              onSelect={() => setOpenDropdowns(prev => ({ ...prev, [certId]: false }))}
-              toggle={(toggleRef: React.Ref<MenuToggleElement>) => (
-                <MenuToggle
-                  ref={toggleRef}
-                  aria-label="kebab dropdown toggle"
-                  variant="plain"
-                  onClick={() => toggleDropdown(certId)}
-                  isExpanded={openDropdowns[certId] || false}
-                >
-                  <EllipsisVIcon />
-                </MenuToggle>
-              )}
-              shouldFocusToggleOnSelect
-            >
-              <DropdownList>
-                <DropdownItem
-                  key="inspect"
-                  onClick={() => handleInspect(cert)}
-                >
-                  {t('Inspect')}
-                </DropdownItem>
-                <DropdownItem
-                  key="delete"
-                  onClick={() => handleDelete(cert)}
-                >
-                  {t('Delete')}
-                </DropdownItem>
-              </DropdownList>
-            </Dropdown>
-          ),
+          <Label
+            key={`status-${certId}`}
+            color={conditionStatus.color as LabelProps['color']}
+            icon={conditionStatus.icon}
+          >
+            {conditionStatus.status}
+          </Label>,
+          <Dropdown
+            key={`dropdown-${certId}`}
+            isOpen={openDropdowns[certId] || false}
+            onSelect={() => setOpenDropdowns((prev) => ({ ...prev, [certId]: false }))}
+            toggle={(toggleRef: React.Ref<MenuToggleElement>) => (
+              <MenuToggle
+                ref={toggleRef}
+                aria-label="kebab dropdown toggle"
+                variant="plain"
+                onClick={() => toggleDropdown(certId)}
+                isExpanded={openDropdowns[certId] || false}
+              >
+                <EllipsisVIcon />
+              </MenuToggle>
+            )}
+            shouldFocusToggleOnSelect
+          >
+            <DropdownList>
+              <DropdownItem key="inspect" onClick={() => handleInspect(cert)}>
+                {t('Inspect')}
+              </DropdownItem>
+              <DropdownItem key="delete" onClick={() => handleDelete(cert)}>
+                {t('Delete')}
+              </DropdownItem>
+            </DropdownList>
+          </Dropdown>,
         ],
       };
     });
@@ -217,12 +216,14 @@ export const CertificatesTable: React.FC<CertificatesTableProps> = ({ selectedPr
         emptyStateBody={
           selectedProject === 'all'
             ? t('No certificates are currently available in all projects.')
-            : t('No certificates are currently available in the project {{project}}.', { project: selectedProject })
+            : t('No certificates are currently available in the project {{project}}.', {
+                project: selectedProject,
+              })
         }
         selectedProject={selectedProject}
         data-test="certificates-table"
       />
-      
+
       <Modal
         variant={ModalVariant.small}
         title={`${t('Delete')} ${t('Certificate')}`}
@@ -231,19 +232,34 @@ export const CertificatesTable: React.FC<CertificatesTableProps> = ({ selectedPr
       >
         <div style={{ padding: '1.5rem' }}>
           {deleteModal.error && (
-            <Alert variant={AlertVariant.danger} title={t('Delete failed')} isInline style={{ marginBottom: '1.5rem' }}>
+            <Alert
+              variant={AlertVariant.danger}
+              title={t('Delete failed')}
+              isInline
+              style={{ marginBottom: '1.5rem' }}
+            >
               {deleteModal.error}
             </Alert>
           )}
           <div style={{ marginBottom: '1.5rem' }}>
             <p style={{ marginBottom: '1rem', fontSize: '1rem', lineHeight: '1.5' }}>
-              {`Are you sure you want to delete the ${t('Certificate')} "${deleteModal.certificate?.metadata?.name || ''}"?`}
+              {`Are you sure you want to delete the ${t('Certificate')} "${
+                deleteModal.certificate?.metadata?.name || ''
+              }"?`}
             </p>
             <p style={{ margin: 0, fontSize: '0.875rem', color: '#6a737d' }}>
               <strong>{t('This action cannot be undone.')}</strong>
             </p>
           </div>
-          <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.75rem', paddingTop: '1rem', borderTop: '1px solid #e1e5e9' }}>
+          <div
+            style={{
+              display: 'flex',
+              justifyContent: 'flex-end',
+              gap: '0.75rem',
+              paddingTop: '1rem',
+              borderTop: '1px solid #e1e5e9',
+            }}
+          >
             <Button key="cancel" variant="link" onClick={cancelDelete}>
               {t('Cancel')}
             </Button>

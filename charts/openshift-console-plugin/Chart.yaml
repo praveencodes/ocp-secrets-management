@@ -1,5 +1,26 @@
 apiVersion: v2
-name: openshift-console-plugin
-description: A Helm chart for Kubernetes
+name: ocp-secrets-management
+description: |
+  OpenShift Console Plugin for Secrets Management.
+  Provides a unified UI for managing:
+  - cert-manager Certificates and Issuers
+  - External Secrets Operator resources
+  - Secrets Store CSI Driver configurations
+
 type: application
 version: 0.1.0
+appVersion: "1.0.0"
+kubeVersion: ">=1.27.0"
+keywords:
+  - openshift
+  - console-plugin
+  - secrets
+  - cert-manager
+  - external-secrets
+  - secrets-store-csi
+home: https://github.com/openshift/ocp-secrets-management
+sources:
+  - https://github.com/openshift/ocp-secrets-management
+maintainers:
+  - name: OpenShift Team
+    email: openshift-team@redhat.com

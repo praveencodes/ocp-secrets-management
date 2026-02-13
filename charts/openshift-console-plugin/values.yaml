@@ -1,8 +1,20 @@
 ---
+# OCP Secrets Management Console Plugin
+# This Helm chart deploys the console plugin for managing cert-manager,
+# External Secrets Operator, and Secrets Store CSI Driver resources.
+#
+# For operator-managed deployments, use the SecretsManagementConfig CRD instead.
+
 plugin:
-  name: ""
-  description: ""
-  image: ""
+  # Plugin name (required) - matches the console-extensions.json name
+  name: "ocp-secrets-management"
+  
+  # Plugin display name shown in the console
+  description: "Manage certificates, external secrets, and secret providers"
+  
+  # Plugin image (required) - placeholder; not pullable. Override with your built image (e.g. quay.io/<your-org>/ocp-secrets-management:latest)
+  image: "openshift.io/ocp-secrets-management:latest"
+  
   imagePullPolicy: IfNotPresent
   imagePullSecrets: []
   replicas: 2
@@ -24,6 +36,9 @@ plugin:
     requests:
       cpu: 10m
       memory: 50Mi
+    limits:
+      cpu: 100m
+      memory: 128Mi
   basePath: /
   certificateSecretName: ""
   serviceAccount:
@@ -53,3 +68,23 @@ plugin:
         requests:
           cpu: 10m
           memory: 50Mi
+
+# RBAC configuration for secrets management resources
+rbac:
+  # Create ClusterRoles for managing secrets resources
+  create: true
+  
+  # Prefix for ClusterRole names (e.g., secrets-management-view, secrets-management-delete)
+  rolePrefix: "secrets-management"
+  
+  # Create view role (get, list, watch)
+  viewRole:
+    enabled: true
+  
+  # Create delete role (delete only)
+  deleteRole:
+    enabled: true
+  
+  # Create admin role (full access)
+  adminRole:
+    enabled: true

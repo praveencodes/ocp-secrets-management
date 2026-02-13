@@ -1,0 +1,133 @@
+{{- if .Values.rbac.create }}
+{{- $rolePrefix := .Values.rbac.rolePrefix | default "secrets-management" }}
+
+{{- if .Values.rbac.viewRole.enabled }}
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: {{ $rolePrefix }}-view
+  labels:
+    {{- include "openshift-console-plugin.labels" . | nindent 4 }}
+    app.kubernetes.io/component: rbac
+rules:
+  # cert-manager resources
+  - apiGroups:
+      - cert-manager.io
+    resources:
+      - certificates
+      - issuers
+      - clusterissuers
+      - certificaterequests
+    verbs:
+      - get
+      - list
+      - watch
+  # external-secrets resources
+  - apiGroups:
+      - external-secrets.io
+    resources:
+      - externalsecrets
+      - clusterexternalsecrets
+      - secretstores
+      - clustersecretstores
+      - pushsecrets
+    verbs:
+      - get
+      - list
+      - watch
+  # secrets-store-csi resources
+  - apiGroups:
+      - secrets-store.csi.x-k8s.io
+    resources:
+      - secretproviderclasses
+      - secretproviderclasspodstatuses
+    verbs:
+      - get
+      - list
+      - watch
+{{- end }}
+
+{{- if .Values.rbac.deleteRole.enabled }}
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: {{ $rolePrefix }}-delete
+  labels:
+    {{- include "openshift-console-plugin.labels" . | nindent 4 }}
+    app.kubernetes.io/component: rbac
+rules:
+  # cert-manager resources
+  - apiGroups:
+      - cert-manager.io
+    resources:
+      - certificates
+      - issuers
+      - clusterissuers
+      - certificaterequests
+    verbs:
+      - delete
+  # external-secrets resources
+  - apiGroups:
+      - external-secrets.io
+    resources:
+      - externalsecrets
+      - clusterexternalsecrets
+      - secretstores
+      - clustersecretstores
+      - pushsecrets
+    verbs:
+      - delete
+  # secrets-store-csi resources (secretproviderclasspodstatuses omitted: status subresource
+  # managed by the CSI driver; only SecretProviderClass resources are user-deleted)
+  - apiGroups:
+      - secrets-store.csi.x-k8s.io
+    resources:
+      - secretproviderclasses
+    verbs:
+      - delete
+{{- end }}
+
+{{- if .Values.rbac.adminRole.enabled }}
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: {{ $rolePrefix }}-admin
+  labels:
+    {{- include "openshift-console-plugin.labels" . | nindent 4 }}
+    app.kubernetes.io/component: rbac
+rules:
+  # cert-manager resources
+  - apiGroups:
+      - cert-manager.io
+    resources:
+      - certificates
+      - issuers
+      - clusterissuers
+      - certificaterequests
+    verbs:
+      - "*"
+  # external-secrets resources
+  - apiGroups:
+      - external-secrets.io
+    resources:
+      - externalsecrets
+      - clusterexternalsecrets
+      - secretstores
+      - clustersecretstores
+      - pushsecrets
+    verbs:
+      - "*"
+  # secrets-store-csi resources
+  - apiGroups:
+      - secrets-store.csi.x-k8s.io
+    resources:
+      - secretproviderclasses
+      - secretproviderclasspodstatuses
+    verbs:
+      - "*"
+{{- end }}
+
+{{- end }}

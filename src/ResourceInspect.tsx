@@ -20,16 +20,20 @@ import {
 } from '@patternfly/react-core';
 import { ArrowLeftIcon, KeyIcon, CheckCircleIcon, TimesCircleIcon } from '@patternfly/react-icons';
 import { useK8sWatchResource } from '@openshift-console/dynamic-plugin-sdk';
-import { CertificateModel } from './components/crds/Certificate';
-import { IssuerModel, ClusterIssuerModel } from './components/crds/Issuer';
-import { ExternalSecretModel, ClusterExternalSecretModel } from './components/crds/ExternalSecret';
-import { SecretStoreModel, ClusterSecretStoreModel } from './components/crds/SecretStore';
-import { PushSecretModel, ClusterPushSecretModel } from './components/crds/PushSecret';
 import {
+  CertificateModel,
+  IssuerModel,
+  ClusterIssuerModel,
+  ExternalSecretModel,
+  ClusterExternalSecretModel,
+  SecretStoreModel,
+  ClusterSecretStoreModel,
+  PushSecretModel,
+  ClusterPushSecretModel,
   SecretProviderClassModel,
   SecretProviderClassPodStatusModel,
   SecretProviderClassPodStatus,
-} from './components/crds/SecretProviderClass';
+} from './components/crds';
 import { EventModel, getInvolvedObjectKind, K8sEvent } from './components/crds/Events';
 
 export const ResourceInspect: React.FC = () => {
@@ -100,7 +104,24 @@ export const ResourceInspect: React.FC = () => {
     resourceType === 'clusterexternalsecrets' ||
     resourceType === 'clusterpushsecrets';
 
-  const [resource, loaded, loadError] = useK8sWatchResource<any>({
+  /** Minimal K8s resource shape for inspect view (avoids explicit any). */
+  type K8sResourceInspect = {
+    kind?: string;
+    apiVersion?: string;
+    metadata?: {
+      name?: string;
+      namespace?: string;
+      creationTimestamp?: string;
+      uid?: string;
+      resourceVersion?: string;
+      labels?: Record<string, string>;
+      annotations?: Record<string, string>;
+    };
+    spec?: unknown;
+    status?: unknown;
+  };
+
+  const [resource, loaded, loadError] = useK8sWatchResource<K8sResourceInspect>({
     groupVersionKind: model,
     name: name,
     namespace: isClusterScoped ? undefined : namespace || 'demo',
@@ -343,7 +364,7 @@ export const ResourceInspect: React.FC = () => {
   };
 
   // Function to check if object contains sensitive data
-  const containsSensitiveData = (obj: any): boolean => {
+  const containsSensitiveData = (obj: unknown): boolean => {
     const sensitiveKeys = [
       'password',
       'secret',
@@ -379,7 +400,7 @@ export const ResourceInspect: React.FC = () => {
       'parameters',
     ];
 
-    const checkObject = (data: any): boolean => {
+    const checkObject = (data: unknown): boolean => {
       if (Array.isArray(data)) {
         return data.some(checkObject);
       }
