@@ -1,0 +1,128 @@
+# ClusterRole for the secrets-management-operator
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: secrets-management-operator
+  labels:
+    app.kubernetes.io/name: ocp-secrets-management
+    app.kubernetes.io/part-of: ocp-secrets-management-operator
+rules:
+  # SecretsManagementConfig resources
+  - apiGroups:
+      - secrets-management.openshift.io
+    resources:
+      - secretsmanagementconfigs
+    verbs:
+      - get
+      - list
+      - watch
+      - create
+      - update
+      - patch
+      - delete
+  - apiGroups:
+      - secrets-management.openshift.io
+    resources:
+      - secretsmanagementconfigs/status
+    verbs:
+      - get
+      - update
+      - patch
+  - apiGroups:
+      - secrets-management.openshift.io
+    resources:
+      - secretsmanagementconfigs/finalizers
+    verbs:
+      - update
+
+  # Deployments for plugin
+  - apiGroups:
+      - apps
+    resources:
+      - deployments
+    verbs:
+      - get
+      - list
+      - watch
+      - create
+      - update
+      - patch
+      - delete
+
+  # Core resources (namespaces: no delete - operator only creates its own namespace)
+  - apiGroups:
+      - ""
+    resources:
+      - services
+      - serviceaccounts
+      - configmaps
+      - namespaces
+    verbs:
+      - get
+      - list
+      - watch
+      - create
+      - update
+      - patch
+
+  # RBAC resources (for creating default roles)
+  - apiGroups:
+      - rbac.authorization.k8s.io
+    resources:
+      - clusterroles
+      - clusterrolebindings
+    verbs:
+      - get
+      - list
+      - watch
+      - create
+      - update
+      - patch
+      - delete
+
+  # ConsolePlugin for OpenShift
+  - apiGroups:
+      - console.openshift.io
+    resources:
+      - consoleplugins
+    verbs:
+      - get
+      - list
+      - watch
+      - create
+      - update
+      - patch
+      - delete
+
+  # CRDs for operator detection
+  - apiGroups:
+      - apiextensions.k8s.io
+    resources:
+      - customresourcedefinitions
+    verbs:
+      - get
+      - list
+      - watch
+
+  # Events for status reporting
+  - apiGroups:
+      - ""
+    resources:
+      - events
+    verbs:
+      - create
+      - patch
+
+  # Leader election
+  - apiGroups:
+      - coordination.k8s.io
+    resources:
+      - leases
+    verbs:
+      - get
+      - list
+      - watch
+      - create
+      - update
+      - patch
+      - delete

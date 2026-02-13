@@ -3,6 +3,7 @@ import { useTranslation } from 'react-i18next';
 
 import {
   Label,
+  LabelProps,
   Dropdown,
   DropdownItem,
   DropdownList,
@@ -30,7 +31,7 @@ import {
   ClusterPushSecret,
   PushSecretResource,
   isClusterPushSecret,
-} from './crds/PushSecret';
+} from './crds';
 
 const getPushSecretStatus = (pushSecret: PushSecretResource) => {
   if (!pushSecret.status?.conditions) {
@@ -198,10 +199,15 @@ export const PushSecretsTable: React.FC<PushSecretsTableProps> = ({ selectedProj
           sourceSecret,
           refreshInterval,
           expiryDate,
-          <Label color={conditionStatus.color as any} icon={conditionStatus.icon}>
+          <Label
+            key={`status-${pushSecretId}`}
+            color={conditionStatus.color as LabelProps['color']}
+            icon={conditionStatus.icon}
+          >
             {conditionStatus.status}
           </Label>,
           <Dropdown
+            key={`dropdown-${pushSecretId}`}
             isOpen={openDropdowns[pushSecretId] || false}
             onSelect={() => setOpenDropdowns((prev) => ({ ...prev, [pushSecretId]: false }))}
             toggle={(toggleRef: React.Ref<MenuToggleElement>) => (
@@ -262,7 +268,9 @@ export const PushSecretsTable: React.FC<PushSecretsTableProps> = ({ selectedProj
         emptyStateBody={
           selectedProject === 'all'
             ? t('No PushSecrets are currently available in all projects.')
-            : t('No PushSecrets are currently available in the project {{project}}.', { project: selectedProject })
+            : t('No PushSecrets are currently available in the project {{project}}.', {
+                project: selectedProject,
+              })
         }
         selectedProject={selectedProject}
         data-test="push-secrets-table"

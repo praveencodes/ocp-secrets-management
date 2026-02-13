@@ -6,3 +6,13 @@ integration-tests/videos
 integration-tests/screenshots
 # Cursor Rules Directory
 .cursor
+
+# Fetched CRDs (regenerate with `make fetch-crds`)
+crds/
+
+# Keep generated types in git for now
+# src/generated/
+
+# Exclude generated files
+operator/bin
+operator/cover.out

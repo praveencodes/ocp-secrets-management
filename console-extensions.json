@@ -16,13 +16,22 @@
     }
   },
   {
+    "type": "console.navigation/section",
+    "properties": {
+      "id": "plugins",
+      "name": "%plugin__ocp-secrets-management~Plugins%",
+      "perspective": "admin",
+      "insertAfter": "observe"
+    }
+  },
+  {
     "type": "console.navigation/href",
     "properties": {
       "id": "secrets-management",
       "name": "%plugin__ocp-secrets-management~Secrets Management%",
       "href": "/secrets-management",
       "perspective": "admin",
-      "section": "workloads"
+      "section": "plugins"
     }
   }
 ]

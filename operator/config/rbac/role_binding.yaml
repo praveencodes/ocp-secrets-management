@@ -1,0 +1,15 @@
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: secrets-management-operator
+  labels:
+    app.kubernetes.io/name: ocp-secrets-management
+    app.kubernetes.io/part-of: ocp-secrets-management-operator
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: secrets-management-operator
+subjects:
+  - kind: ServiceAccount
+    name: secrets-management-operator
+    namespace: openshift-secrets-management

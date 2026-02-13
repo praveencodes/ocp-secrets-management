@@ -1,12 +1,6 @@
 import * as React from 'react';
 import { useTranslation } from 'react-i18next';
-import {
-  EmptyState,
-  EmptyStateBody,
-  Title,
-  Alert,
-  AlertVariant,
-} from '@patternfly/react-core';
+import { EmptyState, EmptyStateBody, Title, Alert, AlertVariant } from '@patternfly/react-core';
 import { SearchIcon } from '@patternfly/react-icons';
 
 interface Column {
@@ -44,7 +38,9 @@ export const ResourceTable: React.FC<ResourceTableProps> = ({
 
   const defaultEmptyStateBody =
     selectedProject && selectedProject !== 'all'
-      ? t('No resources of this type are currently available in project {{project}}.', { project: selectedProject })
+      ? t('No resources of this type are currently available in project {{project}}.', {
+          project: selectedProject,
+        })
       : t('No resources of this type are currently available in the demo project.');
 
   if (loading) {
@@ -60,11 +56,7 @@ export const ResourceTable: React.FC<ResourceTableProps> = ({
   if (error) {
     return (
       <div className="co-m-pane__body" data-test={`${dataTest}-error`}>
-        <Alert
-          variant={AlertVariant.danger}
-          title={t('Error loading resources')}
-          isInline
-        >
+        <Alert variant={AlertVariant.danger} title={t('Error loading resources')} isInline>
           {error}
         </Alert>
       </div>
@@ -79,9 +71,7 @@ export const ResourceTable: React.FC<ResourceTableProps> = ({
           <Title size="lg" headingLevel="h4">
             {emptyStateTitle || t('No resources found')}
           </Title>
-          <EmptyStateBody>
-            {emptyStateBody ?? defaultEmptyStateBody}
-          </EmptyStateBody>
+          <EmptyStateBody>{emptyStateBody ?? defaultEmptyStateBody}</EmptyStateBody>
         </EmptyState>
       </div>
     );
@@ -110,9 +100,7 @@ export const ResourceTable: React.FC<ResourceTableProps> = ({
           <thead>
             <tr style={{ borderBottom: subtleBorder }}>
               {columns.map((column, index) => {
-                const width = hasSpecifiedWidths
-                  ? `${(column.width || 0)}%`
-                  : `${defaultWidth}%`;
+                const width = hasSpecifiedWidths ? `${column.width || 0}%` : `${defaultWidth}%`;
 
                 return (
                   <th
@@ -136,9 +124,9 @@ export const ResourceTable: React.FC<ResourceTableProps> = ({
           <tbody>
             {rows.map((row, rowIndex) => (
               <tr key={rowIndex} style={{ borderBottom: subtleBorder }}>
-                {columns.map((_column, colIndex) => (
+                {row.cells.map((cell, cellIndex) => (
                   <td
-                    key={colIndex}
+                    key={cellIndex}
                     style={{
                       paddingLeft: '1rem',
                       paddingRight: '1rem',
@@ -149,7 +137,7 @@ export const ResourceTable: React.FC<ResourceTableProps> = ({
                       border: 'none',
                     }}
                   >
-                    {row.cells[colIndex] ?? null}
+                    {cell ?? null}
                   </td>
                 ))}
               </tr>

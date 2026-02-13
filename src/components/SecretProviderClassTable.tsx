@@ -3,6 +3,7 @@ import { useTranslation } from 'react-i18next';
 
 import {
   Label,
+  LabelProps,
   Dropdown,
   DropdownItem,
   DropdownList,
@@ -27,7 +28,7 @@ import {
   SecretProviderClassPodStatusModel,
   SecretProviderClass,
   SecretProviderClassPodStatus,
-} from './crds/SecretProviderClass';
+} from './crds';
 
 const getProviderIcon = (provider: string) => {
   switch (provider.toLowerCase()) {
@@ -60,9 +61,7 @@ const getSecretProviderClassStatus = (
   }
 
   // Check if any pod has this SecretProviderClass mounted (guard against missing status)
-  const mountedPods = relevantPodStatuses.filter(
-    (podStatus) => podStatus.status?.mounted === true,
-  );
+  const mountedPods = relevantPodStatuses.filter((podStatus) => podStatus.status?.mounted === true);
 
   if (mountedPods.length > 0) {
     return { status: 'Ready', icon: <CheckCircleIcon />, color: 'green' };
@@ -199,16 +198,21 @@ export const SecretProviderClassTable: React.FC<SecretProviderClassTableProps> =
         cells: [
           spc.metadata.name,
           spc.metadata.namespace,
-          <span>
+          <span key={`provider-${spcId}`}>
             {getProviderIcon(spc.spec?.provider || '')} {spc.spec?.provider || 'Unknown'}
           </span>,
           secretObjectsText,
           parametersText,
           expiryDate,
-          <Label color={conditionStatus.color as any} icon={conditionStatus.icon}>
+          <Label
+            key={`status-${spcId}`}
+            color={conditionStatus.color as LabelProps['color']}
+            icon={conditionStatus.icon}
+          >
             {conditionStatus.status}
           </Label>,
           <Dropdown
+            key={`dropdown-${spcId}`}
             isOpen={openDropdowns[spcId] || false}
             onSelect={() => setOpenDropdowns((prev) => ({ ...prev, [spcId]: false }))}
             toggle={(toggleRef: React.Ref<MenuToggleElement>) => (
@@ -255,7 +259,9 @@ export const SecretProviderClassTable: React.FC<SecretProviderClassTableProps> =
         emptyStateBody={
           selectedProject === 'all'
             ? t('No SecretProviderClasses are currently available in all projects.')
-            : t('No SecretProviderClasses are currently available in the project {{project}}.', { project: selectedProject })
+            : t('No SecretProviderClasses are currently available in the project {{project}}.', {
+                project: selectedProject,
+              })
         }
         selectedProject={selectedProject}
         data-test="secret-provider-classes-table"
