@@ -35,6 +35,64 @@ import {
   SecretProviderClassPodStatus,
 } from './components/crds';
 import { EventModel, getInvolvedObjectKind, K8sEvent } from './components/crds/Events';
+import { dump as yamlDump } from 'js-yaml';
+
+// YAML syntax colors (on black background): blue (keys), mustard yellow (values)
+const YAML_KEY_COLOR = '#60a5fa';
+const YAML_VALUE_COLOR = '#eab308';
+const HIDDEN_VALUE_PLACEHOLDER = '********';
+
+function colorizeYaml(yamlString: string): React.ReactNode {
+  const lines = yamlString.split('\n');
+  return (
+    <>
+      {lines.map((line, i) => {
+        // Key: value
+        const keyValueMatch = line.match(/^(\s*)(.+?)(\s*:\s*)(.*)$/);
+        if (keyValueMatch) {
+          const [, indent, key, sep, value] = keyValueMatch;
+          return (
+            <span key={i}>
+              {indent}
+              <span style={{ color: YAML_KEY_COLOR }}>{key}</span>
+              {sep}
+              <span style={{ color: YAML_VALUE_COLOR }}>{value}</span>
+              {'\n'}
+            </span>
+          );
+        }
+        // List item: - value
+        const listMatch = line.match(/^(\s*)(-\s+)(.*)$/);
+        if (listMatch) {
+          const [, indent, dash, rest] = listMatch;
+          return (
+            <span key={i}>
+              {indent}
+              <span style={{ color: YAML_KEY_COLOR }}>{dash.trim() || '-'}</span>
+              <span style={{ color: YAML_VALUE_COLOR }}>{rest}</span>
+              {'\n'}
+            </span>
+          );
+        }
+        // Comment or continuation line: use value color for non-empty, keep structure
+        if (line.trim().startsWith('#')) {
+          return (
+            <span key={i} style={{ color: '#6b7280' }}>
+              {line}
+              {'\n'}
+            </span>
+          );
+        }
+        return (
+          <span key={i}>
+            {line ? <span style={{ color: YAML_VALUE_COLOR }}>{line}</span> : null}
+            {'\n'}
+          </span>
+        );
+      })}
+    </>
+  );
+}
 
 export const ResourceInspect: React.FC = () => {
   const { t } = useTranslation('plugin__ocp-secrets-management');
@@ -168,7 +226,16 @@ export const ResourceInspect: React.FC = () => {
       <Card>
         <CardTitle style={{ color: 'var(--pf-t--color--blue--30)' }}>{t('Metadata')}</CardTitle>
         <CardBody>
-          <DescriptionList isHorizontal style={{ rowGap: '0.25rem' }}>
+          <DescriptionList
+            isHorizontal
+            style={{
+              rowGap: '0.25rem',
+              background: '#1e1e1e',
+              paddingTop: '16px',
+              paddingLeft: '16px',
+              paddingBottom: '16px',
+            }}
+          >
             <DescriptionListGroup
               style={{
                 display: 'flex',
@@ -303,8 +370,13 @@ export const ResourceInspect: React.FC = () => {
       );
     }
 
+    const cardStyle = {
+      background: '#1e1e1e',
+      borderRadius: '4px',
+      border: '1px solid #374151',
+    };
     return (
-      <Card>
+      <Card style={cardStyle}>
         <CardTitle style={{ color: 'var(--pf-t--color--blue--30)' }}>{t('Labels')}</CardTitle>
         <CardBody>
           <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
@@ -334,11 +406,16 @@ export const ResourceInspect: React.FC = () => {
       );
     }
 
+    const cardStyle = {
+      background: '#1e1e1e',
+      borderRadius: '4px',
+      border: '1px solid #374151',
+    };
     return (
-      <Card>
+      <Card style={cardStyle}>
         <CardTitle style={{ color: 'var(--pf-t--color--blue--30)' }}>{t('Annotations')}</CardTitle>
         <CardBody>
-          <DescriptionList isHorizontal style={{ rowGap: '0.25rem' }}>
+          <DescriptionList isHorizontal style={{ rowGap: '0.25rem', background: '#1e1e1e' }}>
             {Object.entries(annotations).map(([key, value]) => (
               <DescriptionListGroup
                 key={key}
@@ -452,12 +529,17 @@ export const ResourceInspect: React.FC = () => {
               padding: '16px',
               borderRadius: '4px',
               overflow: 'auto',
-              fontSize: '12px',
+              fontSize: '13px',
               maxHeight: '400px',
-              border: '1px solid #d2d2d2',
+              background: '#1e1e1e',
+              border: '1px solid #374151',
             }}
           >
-            {shouldHideContent ? '********' : JSON.stringify(resource.spec, null, 2)}
+            {shouldHideContent ? (
+              <span style={{ color: YAML_VALUE_COLOR }}>{HIDDEN_VALUE_PLACEHOLDER}</span>
+            ) : (
+              colorizeYaml(yamlDump(resource.spec, { lineWidth: -1 }))
+            )}
           </pre>
         </CardBody>
       </Card>
@@ -467,7 +549,10 @@ export const ResourceInspect: React.FC = () => {
   const renderStatus = () => {
     if (!resource?.status) return null;
 
-    const hasSensitiveData = containsSensitiveData(resource.status);
+    // For Certificates, always show the toggle when status exists (status may reference secrets/certs);
+    // for other resources, only show when status contains sensitive-looking keys.
+    const hasSensitiveData =
+      resourceType === 'certificates' || containsSensitiveData(resource.status);
     const shouldHideContent = hasSensitiveData && !showStatusSensitiveData;
 
     return (
@@ -481,8 +566,8 @@ export const ResourceInspect: React.FC = () => {
                 label={
                   showStatusSensitiveData ? t('Hide sensitive data') : t('Show sensitive data')
                 }
-                isChecked={!showStatusSensitiveData}
-                onChange={(event, checked) => setShowStatusSensitiveData(!checked)}
+                isChecked={showStatusSensitiveData}
+                onChange={(event, checked) => setShowStatusSensitiveData(checked)}
                 ouiaId="StatusSensitiveToggle"
               />
             )}
@@ -494,12 +579,17 @@ export const ResourceInspect: React.FC = () => {
               padding: '16px',
               borderRadius: '4px',
               overflow: 'auto',
-              fontSize: '12px',
+              fontSize: '13px',
               maxHeight: '400px',
-              border: '1px solid #d2d2d2',
+              background: '#1e1e1e',
+              border: '1px solid #374151',
             }}
           >
-            {shouldHideContent ? '...' : JSON.stringify(resource.status, null, 2)}
+            {shouldHideContent ? (
+              <span style={{ color: YAML_VALUE_COLOR }}>{HIDDEN_VALUE_PLACEHOLDER}</span>
+            ) : (
+              colorizeYaml(yamlDump(resource.status, { lineWidth: -1 }))
+            )}
           </pre>
         </CardBody>
       </Card>
@@ -588,34 +678,63 @@ export const ResourceInspect: React.FC = () => {
           )}
           {eventsLoaded && !eventsError && sorted.length === 0 && <em>{t('No events')}</em>}
           {eventsLoaded && !eventsError && sorted.length > 0 && (
-            <div style={{ overflowX: 'auto' }}>
-              <table className="pf-c-table pf-m-compact pf-m-grid-md" style={{ width: '100%' }}>
+            <div
+              style={{
+                overflowX: 'auto',
+                background: '#1e1e1e',
+                borderRadius: '4px',
+                border: '1px solid #374151',
+                paddingLeft: '16px',
+                paddingTop: '16px',
+              }}
+            >
+              <table className="pf-c-table pf-m-grid-md" style={{ width: '100%' }}>
                 <thead>
                   <tr>
-                    <th>{t('Type')}</th>
-                    <th>{t('Reason')}</th>
-                    <th>{t('Message')}</th>
-                    <th>{t('Count')}</th>
-                    <th>{t('Last seen')}</th>
+                    <th style={{ paddingTop: '0.375rem', paddingBottom: '0.375rem' }}>
+                      {t('Type')}
+                    </th>
+                    <th style={{ paddingTop: '0.375rem', paddingBottom: '0.375rem' }}>
+                      {t('Reason')}
+                    </th>
+                    <th style={{ paddingTop: '0.375rem', paddingBottom: '0.375rem' }}>
+                      {t('Message')}
+                    </th>
+                    <th style={{ paddingTop: '0.375rem', paddingBottom: '0.375rem' }}>
+                      {t('Count')}
+                    </th>
+                    <th style={{ paddingTop: '0.375rem', paddingBottom: '0.375rem' }}>
+                      {t('Last seen')}
+                    </th>
                   </tr>
                 </thead>
                 <tbody>
                   {sorted.map((evt) => (
                     <tr key={evt.metadata?.name ?? evt.reason ?? ''}>
-                      <td>
+                      <td style={{ paddingTop: '0.375rem', paddingBottom: '0.375rem' }}>
                         <Label color={evt.type === 'Warning' ? 'orange' : 'blue'}>
                           {evt.type || 'Normal'}
                         </Label>
                       </td>
-                      <td>{evt.reason ?? '-'}</td>
+                      <td style={{ paddingTop: '0.375rem', paddingBottom: '0.375rem' }}>
+                        {evt.reason ?? '-'}
+                      </td>
                       <td
-                        style={{ maxWidth: '20rem', overflow: 'hidden', textOverflow: 'ellipsis' }}
+                        style={{
+                          maxWidth: '20rem',
+                          overflow: 'hidden',
+                          textOverflow: 'ellipsis',
+                          paddingTop: '0.75rem',
+                          paddingBottom: '0.75rem',
+                        }}
                         title={evt.message}
                       >
                         {evt.message ?? '-'}
                       </td>
-                      <td>{evt.count ?? 1}</td>
-                      <td>
+                      <td style={{ paddingTop: '0.375rem', paddingBottom: '0.375rem' }}>
+                        {evt.count ?? 1}
+                      </td>
+                      <td style={{ paddingTop: '0.375rem', paddingBottom: '0.375rem' }}>
                         {formatTimestamp(
                           evt.lastTimestamp ||
                             evt.firstTimestamp ||

@@ -94,5 +94,8 @@
     "babel-loader": "^8.0.2",
     "i18next": "^23.11.5",
     "mocha": "^10.5.1"
+  },
+  "dependencies": {
+    "js-yaml": "^4.1.1"
   }
 }
