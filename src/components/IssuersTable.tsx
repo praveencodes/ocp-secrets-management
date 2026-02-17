@@ -171,7 +171,6 @@ export const IssuersTable: React.FC<IssuersTableProps> = ({ selectedProject }) =
     { title: t('Namespace'), width: 11 },
     { title: t('Issuer Type'), width: 11 },
     { title: t('Details'), width: 20 },
-    { title: t('Expiry Date'), width: 10 },
     { title: t('Status'), width: 9 },
     { title: '', width: 10 }, // Actions column
   ];
@@ -197,10 +196,6 @@ export const IssuersTable: React.FC<IssuersTableProps> = ({ selectedProject }) =
       } else if (issuer.spec.vault) {
         details = issuer.spec.vault.server;
       }
-      const expiryDate =
-        issuer.metadata.annotations?.['expiry-date'] ??
-        issuer.metadata.annotations?.['expiryDate'] ??
-        '-';
 
       return {
         cells: [
@@ -209,7 +204,6 @@ export const IssuersTable: React.FC<IssuersTableProps> = ({ selectedProject }) =
           issuer.metadata.namespace || 'Cluster',
           issuerType,
           details,
-          expiryDate,
           <Label
             key={`status-${issuerId}`}
             color={conditionStatus.color as LabelProps['color']}

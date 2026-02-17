@@ -41,6 +41,21 @@ const getConditionStatus = (certificate: Certificate) => {
   return { status: 'Not Ready', icon: <TimesCircleIcon />, color: 'red' };
 };
 
+/** Returns remaining days text for an expiry date, e.g. "45 days remaining" or "Expired" */
+function getExpiryRemainingDays(
+  notAfter: string | undefined,
+  t: (key: string, opts?: object) => string,
+): string {
+  if (!notAfter) return '';
+  const expiry = new Date(notAfter).getTime();
+  const now = Date.now();
+  const msPerDay = 24 * 60 * 60 * 1000;
+  const days = Math.floor((expiry - now) / msPerDay);
+  if (days > 0) return t('{{count}} days remaining', { count: days });
+  if (days === 0) return t('Expires today');
+  return days === -1 ? t('Expired') : t('Expired {{count}} days ago', { count: -days });
+}
+
 interface CertificatesTableProps {
   selectedProject: string;
 }
@@ -154,10 +169,13 @@ export const CertificatesTable: React.FC<CertificatesTableProps> = ({ selectedPr
       const conditionStatus = getConditionStatus(cert);
       const dnsNames = cert.spec.dnsNames?.join(', ') || cert.spec.commonName || '-';
       const certId = `${cert.metadata.namespace}-${cert.metadata.name}`;
-      const expiryDate =
-        cert.metadata.annotations?.['expiry-date'] ??
-        cert.metadata.annotations?.['expiryDate'] ??
-        '-';
+      const rawExpiry = cert.status?.notAfter;
+      const remainingText = getExpiryRemainingDays(rawExpiry, t);
+      const expiryDate = rawExpiry
+        ? `${new Date(rawExpiry).toLocaleString()}${remainingText ? ` (${remainingText})` : ''}`
+        : cert.metadata.annotations?.['expiry-date'] ??
+          cert.metadata.annotations?.['expiryDate'] ??
+          '-';
 
       return {
         cells: [

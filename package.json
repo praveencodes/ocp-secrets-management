@@ -29,7 +29,7 @@
   },
   "dependencies": {},
   "devDependencies": {
-    "js-yaml": "^4.1.0",
+    "js-yaml": "^4.1.1",
     "@cypress/webpack-preprocessor": "^5.15.5",
     "@openshift-console/dynamic-plugin-sdk": "1.4.0",
     "@openshift-console/dynamic-plugin-sdk-webpack": "1.1.1",

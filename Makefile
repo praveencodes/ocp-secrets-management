@@ -12,10 +12,10 @@ test: ## Run tests (operator unit tests)
 help: ## Show this help
 	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | sort | awk 'BEGIN {FS = ":.*?## "}; {printf "\033[36m%-20s\033[0m %s\n", $$1, $$2}'
 
-# Container runtime detection
-CONTAINER_RUNTIME ?= $(shell command -v podman 2>/dev/null || command -v docker 2>/dev/null)
-ifeq ($(CONTAINER_RUNTIME),)
-$(error No container runtime found. Please install podman or docker)
+# Container engine: podman by default (override with CONTAINER_RUNTIME=docker if needed)
+CONTAINER_RUNTIME ?= podman
+ifeq ($(shell command -v $(CONTAINER_RUNTIME) 2>/dev/null),)
+$(error Container runtime '$(CONTAINER_RUNTIME)' not found. Please install podman or set CONTAINER_RUNTIME=docker)
 endif
 
 # Image name for scripts
@@ -30,21 +30,32 @@ PLUGIN_IMG ?= openshift.io/ocp-secrets-management:latest
 scripts-image: ## Build the container image for running scripts
 	$(CONTAINER_RUNTIME) build -t $(SCRIPTS_IMAGE) -f scripts/Dockerfile .
 
+# Run fetch/generate as root so writes always succeed on the mount, then chown to host user.
 .PHONY: fetch-crds
 fetch-crds: scripts-image ## Fetch CRDs from upstream repositories (containerized)
-	$(CONTAINER_RUNTIME) run --rm \
+	@mkdir -p $(CURDIR)/crds
+	$(CONTAINER_RUNTIME) run --rm --user 0:0 \
 		-v $(CURDIR)/crds:/app/crds:z \
 		-v $(CURDIR)/crd-sources.json:/app/crd-sources.json:ro,z \
 		$(SCRIPTS_IMAGE) \
 		ts-node scripts/fetch-crds.ts
+	$(CONTAINER_RUNTIME) run --rm --user 0:0 \
+		-v $(CURDIR)/crds:/app/crds:z \
+		$(SCRIPTS_IMAGE) \
+		sh -c "chown -R $$(id -u):$$(id -g) /app/crds"
 
 .PHONY: generate-types
 generate-types: scripts-image ## Generate TypeScript interfaces from CRDs (containerized)
-	$(CONTAINER_RUNTIME) run --rm \
+	@mkdir -p $(CURDIR)/src/generated/crds
+	$(CONTAINER_RUNTIME) run --rm --user 0:0 \
 		-v $(CURDIR)/crds:/app/crds:ro,z \
 		-v $(CURDIR)/src/generated/crds:/app/src/generated/crds:z \
 		$(SCRIPTS_IMAGE) \
 		ts-node scripts/generate-types.ts
+	$(CONTAINER_RUNTIME) run --rm --user 0:0 \
+		-v $(CURDIR)/src/generated/crds:/app/src/generated/crds:z \
+		$(SCRIPTS_IMAGE) \
+		sh -c "chown -R $$(id -u):$$(id -g) /app/src/generated/crds"
 
 .PHONY: update-types
 update-types: fetch-crds generate-types ## Fetch CRDs and generate TypeScript (containerized)
@@ -73,6 +84,9 @@ plugin-check: plugin-typecheck plugin-lint ## Run typecheck + lint (use before p
 
 ##@ Plugin Build (Containerized)
 
+# Set BUILD_OPTS=--no-cache to force a full rebuild (avoids stale "Created" date when cache is reused)
+BUILD_OPTS ?=
+
 .PHONY: plugin-build
 plugin-build: plugin-typecheck ## Build the console plugin (containerized); runs plugin-typecheck first.
 	$(CONTAINER_RUNTIME) run --rm \
@@ -83,7 +97,7 @@ plugin-build: plugin-typecheck ## Build the console plugin (containerized); runs
 
 .PHONY: plugin-image
 plugin-image: plugin-typecheck ## Build the plugin container image; runs plugin-typecheck first.
-	$(CONTAINER_RUNTIME) build -t $(PLUGIN_IMG) -f Dockerfile .
+	$(CONTAINER_RUNTIME) build $(BUILD_OPTS) -t $(PLUGIN_IMG) -f Dockerfile .
 
 .PHONY: plugin-push
 plugin-push: ## Push the plugin container image (override: make plugin-push PLUGIN_IMG=quay.io/<my-org>/ocp-secrets-management:tag)

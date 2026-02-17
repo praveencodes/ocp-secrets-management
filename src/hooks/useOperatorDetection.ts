@@ -29,6 +29,16 @@ const EXTERNAL_SECRETS_CRDS = [
 
 const SECRETS_STORE_CSI_CRDS = ['secretproviderclasses.secrets-store.csi.x-k8s.io'];
 
+/**
+ * Returns true if the error indicates the CRD/resource was not found.
+ * When the operator is not installed, the API may return 404 or an error body
+ * with "not found"; treat that as "not installed" rather than a verification failure.
+ */
+function isNotFoundError(err: unknown): boolean {
+  const msg = err instanceof Error ? err.message : String(err);
+  return /not found/i.test(msg);
+}
+
 async function checkCRDExists(crdName: string): Promise<boolean> {
   // Console proxies Kubernetes API under /api/kubernetes (same as other plugin API calls)
   const response = await consoleFetch(
@@ -37,6 +47,8 @@ async function checkCRDExists(crdName: string): Promise<boolean> {
   if (response.status === 404) return false;
   if (!response.ok) {
     const errorText = await response.text();
+    // Treat "not found" responses (e.g. some proxies return 403/500 with not found body) as missing CRD
+    if (/not found/i.test(errorText)) return false;
     throw new Error(`CRD lookup failed: ${response.status} ${response.statusText} - ${errorText}`);
   }
   const data = await response.json();
@@ -78,7 +90,11 @@ export const useOperatorDetection = (): OperatorDetectionResult => {
       setCertManager({
         installed: false,
         loading: false,
-        error: err instanceof Error ? err.message : 'Unknown error',
+        error: isNotFoundError(err)
+          ? undefined
+          : err instanceof Error
+          ? err.message
+          : 'Unknown error',
       });
     }
 
@@ -90,7 +106,11 @@ export const useOperatorDetection = (): OperatorDetectionResult => {
       setExternalSecrets({
         installed: false,
         loading: false,
-        error: err instanceof Error ? err.message : 'Unknown error',
+        error: isNotFoundError(err)
+          ? undefined
+          : err instanceof Error
+          ? err.message
+          : 'Unknown error',
       });
     }
 
@@ -102,7 +122,11 @@ export const useOperatorDetection = (): OperatorDetectionResult => {
       setSecretsStoreCSI({
         installed: false,
         loading: false,
-        error: err instanceof Error ? err.message : 'Unknown error',
+        error: isNotFoundError(err)
+          ? undefined
+          : err instanceof Error
+          ? err.message
+          : 'Unknown error',
       });
     }
   }, []);

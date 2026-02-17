@@ -5,28 +5,28 @@
     {
       "name": "cert-manager",
       "repo": "cert-manager/cert-manager",
-      "ref": "v1.14.0",
+      "ref": "v1.19.2",
       "crds": [
         {
-          "file": "deploy/crds/crd-certificates.yaml",
+          "file": "deploy/crds/cert-manager.io_certificates.yaml",
           "kind": "Certificate",
           "group": "cert-manager.io",
           "version": "v1"
         },
         {
-          "file": "deploy/crds/crd-issuers.yaml",
+          "file": "deploy/crds/cert-manager.io_issuers.yaml",
           "kind": "Issuer",
           "group": "cert-manager.io",
           "version": "v1"
         },
         {
-          "file": "deploy/crds/crd-clusterissuers.yaml",
+          "file": "deploy/crds/cert-manager.io_clusterissuers.yaml",
           "kind": "ClusterIssuer",
           "group": "cert-manager.io",
           "version": "v1"
         },
         {
-          "file": "deploy/crds/crd-certificaterequests.yaml",
+          "file": "deploy/crds/cert-manager.io_certificaterequests.yaml",
           "kind": "CertificateRequest",
           "group": "cert-manager.io",
           "version": "v1"
@@ -36,31 +36,31 @@
     {
       "name": "external-secrets",
       "repo": "external-secrets/external-secrets",
-      "ref": "v0.9.0",
+      "ref": "v0.20.4",
       "crds": [
         {
           "file": "config/crds/bases/external-secrets.io_externalsecrets.yaml",
           "kind": "ExternalSecret",
           "group": "external-secrets.io",
-          "version": "v1beta1"
+          "version": "v1"
         },
         {
           "file": "config/crds/bases/external-secrets.io_secretstores.yaml",
           "kind": "SecretStore",
           "group": "external-secrets.io",
-          "version": "v1beta1"
+          "version": "v1"
         },
         {
           "file": "config/crds/bases/external-secrets.io_clustersecretstores.yaml",
           "kind": "ClusterSecretStore",
           "group": "external-secrets.io",
-          "version": "v1beta1"
+          "version": "v1"
         },
         {
           "file": "config/crds/bases/external-secrets.io_clusterexternalsecrets.yaml",
           "kind": "ClusterExternalSecret",
           "group": "external-secrets.io",
-          "version": "v1beta1"
+          "version": "v1"
         },
         {
           "file": "config/crds/bases/external-secrets.io_pushsecrets.yaml",

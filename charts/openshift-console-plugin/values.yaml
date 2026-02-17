@@ -15,7 +15,7 @@ plugin:
   # Plugin image (required) - placeholder; not pullable. Override with your built image (e.g. quay.io/<your-org>/ocp-secrets-management:latest)
   image: "openshift.io/ocp-secrets-management:latest"
   
-  imagePullPolicy: IfNotPresent
+  imagePullPolicy: Always
   imagePullSecrets: []
   replicas: 2
   port: 9443

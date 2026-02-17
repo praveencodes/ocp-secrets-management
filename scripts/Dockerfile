@@ -8,7 +8,8 @@ WORKDIR /app
 RUN npm install -g ts-node typescript && \
     npm install js-yaml @types/js-yaml @types/node
 
-# Create non-root user for running scripts
+# Create non-root user (default in image). When running, use -u $$(id -u):$$(id -g)
+# so the process runs as the host user and written files are owned by you.
 RUN addgroup -g 1001 -S appgroup && \
     adduser -u 1001 -S appuser -G appgroup
 

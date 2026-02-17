@@ -84,6 +84,11 @@ const CRDS_DIR = path.join(ROOT_DIR, 'crds');
 const OUTPUT_DIR = path.join(ROOT_DIR, 'src', 'generated', 'crds');
 const MANIFEST_PATH = path.join(CRDS_DIR, 'manifest.json');
 
+/** Replace irregular whitespace (e.g. non-breaking space) with normal space for ESLint no-irregular-whitespace */
+function sanitizeDescription(text: string): string {
+  return text.replace(/[\u00A0\uFEFF\u200B-\u200D\u2028\u2029]/g, ' ').replace(/\s+/g, ' ').trim();
+}
+
 /**
  * Converts an OpenAPI type to TypeScript type
  */
@@ -134,7 +139,7 @@ function openAPITypeToTS(schema: OpenAPISchema, indent = 0): string {
             const optional = !schema.required?.includes(key) ? '?' : '';
             const propType = openAPITypeToTS(propSchema, indent + 1);
             const description = propSchema.description
-              ? `${spaces}  /** ${propSchema.description.replace(/\n/g, ' ')} */\n`
+              ? `${spaces}  /** ${sanitizeDescription(propSchema.description).replace(/\n/g, ' ')} */\n`
               : '';
             // Escape property names with special characters
             const safeName = /^[a-zA-Z_$][a-zA-Z0-9_$]*$/.test(key) ? key : `'${key}'`;
@@ -187,14 +192,20 @@ import { K8sResourceCommon } from '@openshift-console/dynamic-plugin-sdk';
 
 `;
 
-  // Generate Spec interface
+  // Generate Spec: use type alias when result is not an object (e.g. Record<string, unknown>)
   if (specSchema) {
-    output += `export interface ${kind}Spec ${openAPITypeToTS(specSchema)}\n\n`;
+    const specType = openAPITypeToTS(specSchema);
+    output += specType.startsWith('{')
+      ? `export interface ${kind}Spec ${specType}\n\n`
+      : `export type ${kind}Spec = ${specType};\n\n`;
   }
 
-  // Generate Status interface
+  // Generate Status: use type alias when result is not an object (e.g. Record<string, unknown>)
   if (statusSchema) {
-    output += `export interface ${kind}Status ${openAPITypeToTS(statusSchema)}\n\n`;
+    const statusType = openAPITypeToTS(statusSchema);
+    output += statusType.startsWith('{')
+      ? `export interface ${kind}Status ${statusType}\n\n`
+      : `export type ${kind}Status = ${statusType};\n\n`;
   }
 
   // Generate main interface
@@ -288,10 +299,16 @@ export const Models: Record<string, K8sModel> = {\n`;
           // fallback to default plural
         }
       }
+      const label = crd.kind;
+      const labelPlural = `${label}s`;
+      const abbr = label.replace(/[a-z]/g, '').slice(0, 2) || label.slice(0, 1).toUpperCase();
       output += `  ${crd.kind}: {\n`;
+      output += `    abbr: '${abbr}',\n`;
       output += `    apiVersion: '${crd.version}',\n`;
       output += `    apiGroup: '${crd.group}',\n`;
       output += `    kind: '${crd.kind}',\n`;
+      output += `    label: '${label}',\n`;
+      output += `    labelPlural: '${labelPlural}',\n`;
       output += `    plural: '${plural}',\n`;
       output += `  },\n`;
     }

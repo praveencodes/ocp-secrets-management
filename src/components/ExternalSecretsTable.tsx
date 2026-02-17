@@ -33,6 +33,56 @@ import {
   isClusterExternalSecret,
 } from './crds';
 
+/** Parse Kubernetes/Go duration string (e.g. "1h", "30m", "1h30m") to milliseconds */
+function parseDurationMs(duration: string): number {
+  if (!duration || typeof duration !== 'string') return 0;
+  let ms = 0;
+  const re = /(\d+)(h|m|s|ms)/gi;
+  let m: RegExpExecArray | null;
+  while ((m = re.exec(duration)) !== null) {
+    const val = parseInt(m[1], 10);
+    switch (m[2].toLowerCase()) {
+      case 'h':
+        ms += val * 60 * 60 * 1000;
+        break;
+      case 'm':
+        ms += val * 60 * 1000;
+        break;
+      case 's':
+        ms += val * 1000;
+        break;
+      case 'ms':
+        ms += val;
+        break;
+    }
+  }
+  return ms;
+}
+
+/** Format next refresh from status.refreshTime + refreshInterval, with remaining hours in parentheses */
+function getNextRefreshDisplay(
+  refreshTime: string | undefined,
+  refreshIntervalStr: string,
+  t: (key: string, opts?: object) => string,
+): string {
+  if (!refreshTime) return '-';
+  const lastRefresh = new Date(refreshTime).getTime();
+  const intervalMs = parseDurationMs(refreshIntervalStr);
+  if (intervalMs <= 0) return new Date(refreshTime).toLocaleString();
+  const nextRefresh = lastRefresh + intervalMs;
+  const now = Date.now();
+  const remainingMs = nextRefresh - now;
+  const remainingHours = remainingMs / (1000 * 60 * 60);
+  const formattedTime = new Date(nextRefresh).toLocaleString();
+  if (remainingHours > 0) {
+    const hours = Math.round(remainingHours * 10) / 10;
+    return `${formattedTime} (${t('{{count}} hours remaining', { count: hours })})`;
+  }
+  if (remainingHours > -1 / 60) return `${formattedTime} (${t('Due now')})`;
+  const hoursAgo = Math.round(-remainingHours * 10) / 10;
+  return `${formattedTime} (${t('{{count}} hours ago', { count: hoursAgo })})`;
+}
+
 const getConditionStatus = (externalSecret: ExternalSecretResource) => {
   const readyCondition = externalSecret.status?.conditions?.find(
     (condition) => condition.type === 'Ready',
@@ -47,7 +97,7 @@ const getConditionStatus = (externalSecret: ExternalSecretResource) => {
   }
 
   const syncCondition = externalSecret.status?.conditions?.find(
-    (condition) => condition.type === 'SecretSynced',
+    (condition) => (condition.type as string) === 'SecretSynced',
   );
 
   if (syncCondition?.status === 'False') {
@@ -193,7 +243,7 @@ export const ExternalSecretsTable: React.FC<ExternalSecretsTableProps> = ({ sele
     { title: t('Target Secret'), width: 13 },
     { title: t('Secret Store'), width: 18 },
     { title: t('Refresh Interval'), width: 11 },
-    { title: t('Expiry Date'), width: 10 },
+    { title: t('Next Refresh'), width: 22 },
     { title: t('Status'), width: 9 },
     { title: '', width: 10 }, // Actions column
   ];
@@ -230,10 +280,9 @@ export const ExternalSecretsTable: React.FC<ExternalSecretsTableProps> = ({ sele
       }`;
       const resourceType = isCluster ? 'ClusterExternalSecret' : 'ExternalSecret';
       const namespace = isCluster ? 'Cluster-wide' : resource.metadata.namespace;
-      const expiryDate =
-        resource.metadata.annotations?.['expiry-date'] ??
-        resource.metadata.annotations?.['expiryDate'] ??
-        '-';
+      // refreshTime exists on ExternalSecretStatus; ClusterExternalSecretStatus does not have it
+      const refreshTime = !isCluster ? (resource as ExternalSecret).status?.refreshTime : undefined;
+      const nextRefresh = getNextRefreshDisplay(refreshTime, refreshInterval || '', t);
 
       return {
         cells: [
@@ -243,7 +292,7 @@ export const ExternalSecretsTable: React.FC<ExternalSecretsTableProps> = ({ sele
           targetSecret,
           secretStore,
           refreshInterval,
-          expiryDate,
+          nextRefresh,
           <Label
             key={`${secretId}-status`}
             color={conditionStatus.color as LabelProps['color']}
