@@ -129,9 +129,9 @@ undeploy: ## Undeploy controller from the K8s cluster specified in ~/.kube/confi
 	kubectl delete -f config/crd/ --ignore-not-found
 
 # deploy-sample applies the SecretsManagementConfig with PLUGIN_IMG substituted so the plugin deployment uses your image.
-# Depends on install so the SecretsManagementConfig CRD exists (run 'make deploy' first to also run the operator).
+# Depends on deploy so the operator is running and can reconcile the sample (create plugin deployment, ConsolePlugin, etc.).
 .PHONY: deploy-sample
-deploy-sample: install ## Deploy sample SecretsManagementConfig CR. Uses PLUGIN_IMG for the plugin image.
+deploy-sample: deploy ## Deploy sample SecretsManagementConfig CR. Uses PLUGIN_IMG for the plugin image.
 	sed -e 's|image: openshift.io/ocp-secrets-management:latest|image: $(PLUGIN_IMG)|' config/samples/secrets-management_v1alpha1_secretsmanagementconfig.yaml | kubectl apply -f -
 
 .PHONY: undeploy-sample

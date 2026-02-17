@@ -50,9 +50,10 @@ function getExpiryRemainingDays(
   const expiry = new Date(notAfter).getTime();
   const now = Date.now();
   const msPerDay = 24 * 60 * 60 * 1000;
-  const days = Math.floor((expiry - now) / msPerDay);
+  const diffDays = (expiry - now) / msPerDay;
+  const days = diffDays >= 0 ? Math.floor(diffDays) : Math.ceil(diffDays);
   if (days > 0) return t('{{count}} days remaining', { count: days });
-  if (days === 0) return t('Expires today');
+  if (days === 0) return diffDays < 0 ? t('Expired') : t('Expires today');
   return days === -1 ? t('Expired') : t('Expired {{count}} days ago', { count: -days });
 }
 

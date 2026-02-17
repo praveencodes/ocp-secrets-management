@@ -14,9 +14,10 @@ help: ## Show this help
 
 # Container engine: podman by default (override with CONTAINER_RUNTIME=docker if needed)
 CONTAINER_RUNTIME ?= podman
-ifeq ($(shell command -v $(CONTAINER_RUNTIME) 2>/dev/null),)
-$(error Container runtime '$(CONTAINER_RUNTIME)' not found. Please install podman or set CONTAINER_RUNTIME=docker)
-endif
+
+.PHONY: require-container-runtime
+require-container-runtime: ## (Prerequisite) Ensure CONTAINER_RUNTIME is available; used by containerized targets only
+	@command -v $(CONTAINER_RUNTIME) >/dev/null 2>&1 || (echo "Container runtime '$(CONTAINER_RUNTIME)' not found. Please install podman or set CONTAINER_RUNTIME=docker" && exit 1)
 
 # Image name for scripts
 SCRIPTS_IMAGE := ocp-secrets-management-scripts
@@ -27,10 +28,10 @@ PLUGIN_IMG ?= openshift.io/ocp-secrets-management:latest
 ##@ CRD Management (Containerized)
 
 .PHONY: scripts-image
-scripts-image: ## Build the container image for running scripts
+scripts-image: require-container-runtime ## Build the container image for running scripts
 	$(CONTAINER_RUNTIME) build -t $(SCRIPTS_IMAGE) -f scripts/Dockerfile .
 
-# Run fetch/generate as root so writes always succeed on the mount, then chown to host user.
+# Run fetch/generate as root so writes succeed on the mount, then chown to host user (single run per target).
 .PHONY: fetch-crds
 fetch-crds: scripts-image ## Fetch CRDs from upstream repositories (containerized)
 	@mkdir -p $(CURDIR)/crds
@@ -38,11 +39,7 @@ fetch-crds: scripts-image ## Fetch CRDs from upstream repositories (containerize
 		-v $(CURDIR)/crds:/app/crds:z \
 		-v $(CURDIR)/crd-sources.json:/app/crd-sources.json:ro,z \
 		$(SCRIPTS_IMAGE) \
-		ts-node scripts/fetch-crds.ts
-	$(CONTAINER_RUNTIME) run --rm --user 0:0 \
-		-v $(CURDIR)/crds:/app/crds:z \
-		$(SCRIPTS_IMAGE) \
-		sh -c "chown -R $$(id -u):$$(id -g) /app/crds"
+		sh -c "ts-node scripts/fetch-crds.ts && chown -R $(shell id -u):$(shell id -g) /app/crds"
 
 .PHONY: generate-types
 generate-types: scripts-image ## Generate TypeScript interfaces from CRDs (containerized)
@@ -51,11 +48,7 @@ generate-types: scripts-image ## Generate TypeScript interfaces from CRDs (conta
 		-v $(CURDIR)/crds:/app/crds:ro,z \
 		-v $(CURDIR)/src/generated/crds:/app/src/generated/crds:z \
 		$(SCRIPTS_IMAGE) \
-		ts-node scripts/generate-types.ts
-	$(CONTAINER_RUNTIME) run --rm --user 0:0 \
-		-v $(CURDIR)/src/generated/crds:/app/src/generated/crds:z \
-		$(SCRIPTS_IMAGE) \
-		sh -c "chown -R $$(id -u):$$(id -g) /app/src/generated/crds"
+		sh -c "ts-node scripts/generate-types.ts && chown -R $(shell id -u):$(shell id -g) /app/src/generated/crds"
 
 .PHONY: update-types
 update-types: fetch-crds generate-types ## Fetch CRDs and generate TypeScript (containerized)
@@ -64,7 +57,7 @@ update-types: fetch-crds generate-types ## Fetch CRDs and generate TypeScript (c
 ##@ Plugin checks (TypeScript typecheck + lint; containerized, no local Node required)
 
 .PHONY: plugin-typecheck
-plugin-typecheck: ## Run TypeScript type-check (catches unused vars, type errors).
+plugin-typecheck: require-container-runtime ## Run TypeScript type-check (catches unused vars, type errors).
 	$(CONTAINER_RUNTIME) run --rm \
 		-v $(CURDIR):/app:z \
 		-w /app \
@@ -72,7 +65,7 @@ plugin-typecheck: ## Run TypeScript type-check (catches unused vars, type errors
 		sh -c "yarn install && yarn typecheck"
 
 .PHONY: plugin-lint
-plugin-lint: ## Run ESLint and stylelint on plugin source.
+plugin-lint: require-container-runtime ## Run ESLint and stylelint on plugin source.
 	$(CONTAINER_RUNTIME) run --rm \
 		-v $(CURDIR):/app:z \
 		-w /app \
@@ -96,11 +89,11 @@ plugin-build: plugin-typecheck ## Build the console plugin (containerized); runs
 		sh -c "yarn install && yarn build"
 
 .PHONY: plugin-image
-plugin-image: plugin-typecheck ## Build the plugin container image; runs plugin-typecheck first.
+plugin-image: require-container-runtime plugin-typecheck ## Build the plugin container image; runs plugin-typecheck first.
 	$(CONTAINER_RUNTIME) build $(BUILD_OPTS) -t $(PLUGIN_IMG) -f Dockerfile .
 
 .PHONY: plugin-push
-plugin-push: ## Push the plugin container image (override: make plugin-push PLUGIN_IMG=quay.io/<my-org>/ocp-secrets-management:tag)
+plugin-push: require-container-runtime ## Push the plugin container image (override: make plugin-push PLUGIN_IMG=quay.io/<my-org>/ocp-secrets-management:tag)
 	$(CONTAINER_RUNTIME) push $(PLUGIN_IMG)
 
 ##@ Development
@@ -118,7 +111,7 @@ clean: ## Clean generated files
 	rm -rf crds/ src/generated/crds/ dist/
 
 .PHONY: clean-images
-clean-images: ## Remove built container images
+clean-images: require-container-runtime ## Remove built container images
 	$(CONTAINER_RUNTIME) rmi $(SCRIPTS_IMAGE) 2>/dev/null || true
 
 ##@ Operator

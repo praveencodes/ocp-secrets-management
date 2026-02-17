@@ -37,10 +37,10 @@ import {
 function parseDurationMs(duration: string): number {
   if (!duration || typeof duration !== 'string') return 0;
   let ms = 0;
-  const re = /(\d+)(h|m|s|ms)/gi;
+  const re = /(\d+(?:\.\d+)?)(ms|h|m|s)/gi;
   let m: RegExpExecArray | null;
   while ((m = re.exec(duration)) !== null) {
-    const val = parseInt(m[1], 10);
+    const val = parseFloat(m[1]);
     switch (m[2].toLowerCase()) {
       case 'h':
         ms += val * 60 * 60 * 1000;

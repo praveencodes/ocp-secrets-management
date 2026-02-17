@@ -86,7 +86,10 @@ const MANIFEST_PATH = path.join(CRDS_DIR, 'manifest.json');
 
 /** Replace irregular whitespace (e.g. non-breaking space) with normal space for ESLint no-irregular-whitespace */
 function sanitizeDescription(text: string): string {
-  return text.replace(/[\u00A0\uFEFF\u200B-\u200D\u2028\u2029]/g, ' ').replace(/\s+/g, ' ').trim();
+  return text
+    .replace(/[\u00A0\uFEFF\u200B-\u200D\u2028\u2029]/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
 }
 
 /**
@@ -139,7 +142,7 @@ function openAPITypeToTS(schema: OpenAPISchema, indent = 0): string {
             const optional = !schema.required?.includes(key) ? '?' : '';
             const propType = openAPITypeToTS(propSchema, indent + 1);
             const description = propSchema.description
-              ? `${spaces}  /** ${sanitizeDescription(propSchema.description).replace(/\n/g, ' ')} */\n`
+              ? `${spaces}  /** ${sanitizeDescription(propSchema.description)} */\n`
               : '';
             // Escape property names with special characters
             const safeName = /^[a-zA-Z_$][a-zA-Z0-9_$]*$/.test(key) ? key : `'${key}'`;
@@ -300,7 +303,8 @@ export const Models: Record<string, K8sModel> = {\n`;
         }
       }
       const label = crd.kind;
-      const labelPlural = `${label}s`;
+      // Use CRD spec.names.plural for correct plural form (avoids "Statuss" etc.); capitalize for display
+      const labelPlural = plural.charAt(0).toUpperCase() + plural.slice(1);
       const abbr = label.replace(/[a-z]/g, '').slice(0, 2) || label.slice(0, 1).toUpperCase();
       output += `  ${crd.kind}: {\n`;
       output += `    abbr: '${abbr}',\n`;
