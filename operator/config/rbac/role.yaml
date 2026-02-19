@@ -104,6 +104,34 @@ rules:
       - list
       - watch
 
+  # Permissions required so the operator can create ClusterRoles that grant these to the plugin (RBAC escalation rule).
+  # Use "*" so the operator can create roles that grant "*" (admin); the API server requires the creator to hold the same verb.
+  - apiGroups:
+      - cert-manager.io
+    resources:
+      - certificates
+      - issuers
+      - clusterissuers
+    verbs:
+      - "*"
+  - apiGroups:
+      - external-secrets.io
+    resources:
+      - externalsecrets
+      - secretstores
+      - clustersecretstores
+      - clusterexternalsecrets
+      - pushsecrets
+    verbs:
+      - "*"
+  - apiGroups:
+      - secrets-store.csi.x-k8s.io
+    resources:
+      - secretproviderclasses
+      - secretproviderclasspodstatuses
+    verbs:
+      - "*"
+
   # Events for status reporting
   - apiGroups:
       - ""

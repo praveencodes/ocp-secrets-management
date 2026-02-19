@@ -30,6 +30,7 @@ const getProviderType = (secretStore: SecretStore): string => {
   if (!provider) return '-';
   if (provider.aws) return 'AWS';
   if (provider.azurekv) return 'Azure Key Vault';
+  if (provider.bitwardensecretsmanager) return 'Bitwarden Secrets Manager';
   if (provider.gcpsm) return 'Google Secret Manager';
   if (provider.vault) return 'HashiCorp Vault';
   if (provider.kubernetes) return 'Kubernetes';
@@ -45,6 +46,10 @@ const getProviderDetails = (secretStore: SecretStore): string => {
   if (!provider) return '-';
   if (provider.aws) return `${provider.aws.service} (${provider.aws.region || 'default'})`;
   if (provider.azurekv) return provider.azurekv.vaultUrl;
+  if (provider.bitwardensecretsmanager) {
+    const bw = provider.bitwardensecretsmanager;
+    return bw.bitwardenServerSDKURL || bw.apiURL || 'Bitwarden';
+  }
   if (provider.gcpsm) return provider.gcpsm.projectID || '-';
   if (provider.vault) return provider.vault.server;
   if (provider.kubernetes) return provider.kubernetes.server?.url || 'In-cluster';
@@ -210,7 +215,6 @@ export const SecretStoresTable: React.FC<SecretStoresTableProps> = ({ selectedPr
     { title: t('Scope'), width: 10 },
     { title: t('Provider'), width: 12 },
     { title: t('Details'), width: 20 },
-    { title: t('Expiry Date'), width: 10 },
     { title: t('Status'), width: 9 },
     { title: '', width: 10 }, // Actions column
   ];
@@ -231,10 +235,6 @@ export const SecretStoresTable: React.FC<SecretStoresTableProps> = ({ selectedPr
       const typeLabel =
         secretStore.scope === 'Cluster' ? t('ClusterSecretStore') : t('SecretStore');
       const namespace = secretStore.metadata.namespace || 'Cluster-wide';
-      const expiryDate =
-        secretStore.metadata.annotations?.['expiry-date'] ??
-        secretStore.metadata.annotations?.['expiryDate'] ??
-        '-';
 
       return {
         cells: [
@@ -244,7 +244,6 @@ export const SecretStoresTable: React.FC<SecretStoresTableProps> = ({ selectedPr
           isClusterScopedStore(secretStore) ? 'Cluster' : 'Namespace',
           providerType,
           providerDetails,
-          expiryDate,
           <Label
             key={`status-${storeId}`}
             color={conditionStatus.color as LabelProps['color']}

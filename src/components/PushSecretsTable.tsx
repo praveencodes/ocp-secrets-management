@@ -150,7 +150,6 @@ export const PushSecretsTable: React.FC<PushSecretsTableProps> = ({ selectedProj
     { title: t('Secret Store'), width: 16 },
     { title: t('Source Secret'), width: 14 },
     { title: t('Refresh Interval'), width: 11 },
-    { title: t('Expiry Date'), width: 10 },
     { title: t('Status'), width: 9 },
     { title: '', width: 6 }, // Actions column
   ];
@@ -185,10 +184,6 @@ export const PushSecretsTable: React.FC<PushSecretsTableProps> = ({ selectedProj
 
       const resourceType = isCluster ? 'ClusterPushSecret' : 'PushSecret';
       const namespace = isCluster ? 'Cluster-wide' : pushSecret.metadata.namespace;
-      const expiryDate =
-        pushSecret.metadata.annotations?.['expiry-date'] ??
-        pushSecret.metadata.annotations?.['expiryDate'] ??
-        '-';
 
       return {
         cells: [
@@ -198,7 +193,6 @@ export const PushSecretsTable: React.FC<PushSecretsTableProps> = ({ selectedProj
           secretStoreText,
           sourceSecret,
           refreshInterval,
-          expiryDate,
           <Label
             key={`status-${pushSecretId}`}
             color={conditionStatus.color as LabelProps['color']}

@@ -71,6 +71,12 @@ type SecretsManagementConfigReconciler struct {
 // +kubebuilder:rbac:groups=rbac.authorization.k8s.io,resources=clusterroles;clusterrolebindings,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=console.openshift.io,resources=consoleplugins,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=apiextensions.k8s.io,resources=customresourcedefinitions,verbs=get;list;watch
+// Permissions for cert-manager / external-secrets / secrets-store-csi so the operator can create ClusterRoles that grant these to the plugin (RBAC escalation rule; use * so we can grant * to admin role)
+// +kubebuilder:rbac:groups=cert-manager.io,resources=certificates;issuers;clusterissuers,verbs=*
+// +kubebuilder:rbac:groups=external-secrets.io,resources=externalsecrets;secretstores;clustersecretstores;clusterexternalsecrets;pushsecrets,verbs=*
+// +kubebuilder:rbac:groups=secrets-store.csi.x-k8s.io,resources=secretproviderclasses;secretproviderclasspodstatuses,verbs=*
+// +kubebuilder:rbac:groups=core,resources=events,verbs=create;patch
+// +kubebuilder:rbac:groups=coordination.k8s.io,resources=leases,verbs=get;list;watch;create;update;patch;delete
 
 // Reconcile handles the reconciliation loop for SecretsManagementConfig
 func (r *SecretsManagementConfigReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
@@ -155,28 +161,31 @@ func (r *SecretsManagementConfigReconciler) reconcileDelete(ctx context.Context,
 	log := r.Log.WithValues("secretsmanagementconfig", config.Name)
 	log.Info("Reconciling deletion")
 
-	// Clean up ConsolePlugin
+	// Clean up resources; log errors but do not block finalizer removal so the CR can be deleted
 	if err := r.cleanupConsolePlugin(ctx, config); err != nil {
-		log.Error(err, "Failed to cleanup ConsolePlugin")
-		return ctrl.Result{}, err
+		log.Error(err, "Failed to cleanup ConsolePlugin (continuing to remove finalizer)")
 	}
-
-	// Clean up plugin deployment
 	if err := r.cleanupPluginDeployment(ctx, config); err != nil {
-		log.Error(err, "Failed to cleanup plugin deployment")
-		return ctrl.Result{}, err
+		log.Error(err, "Failed to cleanup plugin deployment (continuing to remove finalizer)")
 	}
-
-	// Clean up RBAC resources
 	if err := r.cleanupRBAC(ctx, config); err != nil {
-		log.Error(err, "Failed to cleanup RBAC")
+		log.Error(err, "Failed to cleanup RBAC (continuing to remove finalizer)")
+	}
+
+	// Re-fetch to get latest resourceVersion and avoid update conflicts
+	if err := r.Get(ctx, types.NamespacedName{Name: config.Name}, config); err != nil {
+		if errors.IsNotFound(err) {
+			return ctrl.Result{}, nil
+		}
 		return ctrl.Result{}, err
 	}
 
-	// Remove finalizer
-	controllerutil.RemoveFinalizer(config, FinalizerName)
-	if err := r.Update(ctx, config); err != nil {
-		return ctrl.Result{}, err
+	// Remove finalizer so the API server can complete deletion
+	if controllerutil.ContainsFinalizer(config, FinalizerName) {
+		controllerutil.RemoveFinalizer(config, FinalizerName)
+		if err := r.Update(ctx, config); err != nil {
+			return ctrl.Result{}, err
+		}
 	}
 
 	return ctrl.Result{}, nil
@@ -667,7 +676,16 @@ http {
     ssl_certificate /var/cert/tls.crt;
     ssl_certificate_key /var/cert/tls.key;
     root /usr/share/nginx/html;
-    
+
+    # Serve plugin manifest at / so the console gets a valid manifest when fetching basePath
+    location = / {
+      add_header Content-Type application/json;
+      alias /usr/share/nginx/html/plugin-manifest.json;
+    }
+    location = /plugin-manifest.json {
+      add_header Content-Type application/json;
+    }
+
     location /health {
       return 200 'OK';
       add_header Content-Type text/plain;

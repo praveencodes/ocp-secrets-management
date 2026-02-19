@@ -27,9 +27,10 @@
     "generate-types": "ts-node scripts/generate-types.ts",
     "update-types": "yarn fetch-crds && yarn generate-types"
   },
-  "dependencies": {},
+  "dependencies": {
+    "js-yaml": "^4.1.1"
+  },
   "devDependencies": {
-    "js-yaml": "^4.1.0",
     "@cypress/webpack-preprocessor": "^5.15.5",
     "@openshift-console/dynamic-plugin-sdk": "1.4.0",
     "@openshift-console/dynamic-plugin-sdk-webpack": "1.1.1",
@@ -94,8 +95,5 @@
     "babel-loader": "^8.0.2",
     "i18next": "^23.11.5",
     "mocha": "^10.5.1"
-  },
-  "dependencies": {
-    "js-yaml": "^4.1.1"
   }
 }

@@ -37,7 +37,7 @@ spec:
       containers:
         - name: manager
           image: openshift.io/ocp-secrets-management-operator:latest
-          imagePullPolicy: IfNotPresent
+          imagePullPolicy: Always
           command:
             - /manager
           args:
